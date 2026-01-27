@@ -1,0 +1,55 @@
+{
+    "name": "darvis/laravel-ai-generator",
+    "description": "AI content generation service for Laravel applications with OpenAI support",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Arvid de Jong",
+            "email": "info@arvid.nl"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "illuminate/support": "^11.0|^12.0",
+        "illuminate/http": "^11.0|^12.0"
+    },
+    "require-dev": {
+        "laravel/pint": "^1.0",
+        "mockery/mockery": "^1.6",
+        "orchestra/testbench": "^9.0|^10.0",
+        "pestphp/pest": "^3.0",
+        "pestphp/pest-plugin-laravel": "^3.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Darvis\\LaravelAiGenerator\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Darvis\\LaravelAiGenerator\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "vendor/bin/pest",
+        "test-coverage": "vendor/bin/pest --coverage",
+        "format": "vendor/bin/pint",
+        "format-test": "vendor/bin/pint --test"
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Darvis\\LaravelAiGenerator\\AiGeneratorServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
