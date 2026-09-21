@@ -12,22 +12,22 @@ Use this skill when code generates content or images in an application that has 
 ## How a generation runs
 
 1. `AiGenerator::generate(ContentRequest $request)` fills the empty `language`, `tone`, `readingLevel` and `maxWords` from the config. `imageStyle` falls back to `photo`, `imageAspect` to `16:9`.
-2. The bound `AiContentDriver` is called. The OpenAI driver posts to the Responses API (`/responses`) with a strict JSON schema, so the five text fields are always present.
+2. The bound `AiContentDriver` is called. The OpenAI driver posts to the Responses API (`/responses`) with a strict JSON schema and reads `title`, `intro`, `text`, `seo_title`, `seo_description` and `image_prompt` from the answer.
 3. When `includeImage` is true, which is the **default**, the driver makes a second call to `/images/generations` with the image prompt the model wrote.
 4. Every text field is trimmed and a `ContentResult` comes back.
 
 | Step | Fails when | What you get |
 | --- | --- | --- |
 | API key | `OPENAI_API_KEY` is empty | `RuntimeException`: `OPENAI_API_KEY is not set.` |
-| Text call | connection error, after 2 retries | `RuntimeException`: `OpenAI connection failed: …` |
-| Text call | HTTP 4xx or 5xx, after 2 retries | `RuntimeException`: `OpenAI request failed: …` |
+| Text call | connection error or timeout, on both of its 2 attempts | `RuntimeException`: `OpenAI connection failed: …` |
+| Text call | HTTP 4xx or 5xx, on both of its 2 attempts | `RuntimeException`: `OpenAI request failed: …` |
 | Text call | the output is not JSON, or has no `output_text` | `RuntimeException` |
-| Image call | any error or timeout | no exception: the text comes back, `hasError()` is true, `errorMessage` starts with `OpenAI Image Error:` |
+| Image call | HTTP error or timeout, on both of its 2 attempts | no exception: the text comes back, `hasError()` is true, `errorMessage` starts with `OpenAI Image Error:` |
 | Service provider | `AI_GENERATOR_DRIVER` is a name the package does not know | `RuntimeException`: `Unsupported AI driver: …`, as soon as the driver is resolved |
 
 ## Generating content
 
-Only `topic` is required. Pass `includeImage: false` when the page has no image: it saves the second API call, which is the slow and expensive one.
+Only `topic` is required. Pass `includeImage: false` when the page has no image: it saves the second API call, which OpenAI bills separately.
 
 ```php
 use Darvis\LaravelAiGenerator\ContentRequest;
@@ -54,7 +54,7 @@ $result = AiGenerator::generate(new ContentRequest(
 ## Saving the result
 
 - `text` is HTML written by a model. Sanitise it before you render it unescaped.
-- An image arrives as `imageUrl` or as `imageBase64`, depending on the image model. Handle both. A URL from OpenAI expires, so download it; don't store the URL.
+- An image arrives as `imageUrl` or as `imageBase64`, depending on the image model. Handle both, and store the file yourself: the package does not download or save anything.
 - Check `hasError()` before you mark a result as complete. A result with an error still has all its text.
 
 ```php
@@ -76,7 +76,7 @@ if ($result->hasError()) {
 
 ## Only an image
 
-`AiGenerator::generateImage($prompt, $style, $aspect)` returns an array and never throws: `url` and `base64` on success, `error` on failure. It always calls the OpenAI image API, also when another text driver is bound, and it uses its own timeout of 120 seconds.
+`AiGenerator::generateImage($prompt, $style, $aspect)` returns an array and never throws: `url` and `base64` on success, `error` on failure. It always calls the OpenAI image API, also when another text driver is bound, and it uses its own timeout of 120 seconds and a single attempt, not `OPENAI_TIMEOUT`.
 
 ```php
 $image = AiGenerator::generateImage('A cardboard box on a wooden table', 'photo', '1:1');
@@ -90,20 +90,22 @@ The aspect ratio only changes the size with a `dall-e-3` image model. Other mode
 
 ## Queue it
 
-A text call takes seconds, one with an image tens of seconds. Generate in a queued job, not in a web request, and give the job a `$timeout` above the two calls together. The image call inside `generate()` uses `OPENAI_TIMEOUT` (45 seconds by default); raise it when images time out while the text succeeds.
+Every request inside `generate()` waits up to `OPENAI_TIMEOUT` seconds (45 by default) and is tried twice, the text and the image alike: four waits in the worst case. Generate in a queued job, not in a web request, give the job a `$timeout` above that worst case and `$tries = 1` so a failure is not billed again by itself. Raise `OPENAI_TIMEOUT` when images time out while the text succeeds.
 
 ## Another AI provider
 
 Implement `Darvis\LaravelAiGenerator\Contracts\AiContentDriver` and **replace the binding** in the `register()` method of your own service provider:
 
 ```php
-use App\Services\AiDrivers\AnthropicDriver;
+use App\Services\AiDrivers\AcmeAiDriver;
 use Darvis\LaravelAiGenerator\Contracts\AiContentDriver;
 
-$this->app->singleton(AiContentDriver::class, fn () => new AnthropicDriver);
+$this->app->singleton(AiContentDriver::class, fn () => new AcmeAiDriver);
 ```
 
-- Don't use `$this->app->extend()` and don't set `AI_GENERATOR_DRIVER` to your own name. The package binding throws `Unsupported AI driver` on a name it does not know before an extender runs.
+- Don't use `$this->app->extend()`: it builds the package binding first, and that throws `Unsupported AI driver` on a name it does not know before the extender runs.
+- `AI_GENERATOR_DRIVER` may hold your own name, for example to bind your driver only `if (AiGeneratorConfig::driver() === 'acme')`. That name only works while your binding replaces the package's; without it the same exception is thrown.
+- The package makes no image for a custom driver: `includeImage` does nothing unless the driver acts on it.
 - The driver receives a request with the defaults already filled in, and returns a `ContentResult`. Throw a `RuntimeException` when the text fails; put an image failure in `errorMessage` instead, so the text is not lost.
 - Keep your driver's own settings in your application's config, for example `config/services.php`.
 
@@ -111,13 +113,13 @@ $this->app->singleton(AiContentDriver::class, fn () => new AnthropicDriver);
 
 Read the package settings through `Darvis\LaravelAiGenerator\Support\AiGeneratorConfig`: `driver()`, `defaultLanguage()`, `defaultTone()`, `defaultReadingLevel()`, `defaultMaxWords()`, `openAiApiKey()` (null when empty), `openAiBaseUrl()`, `openAiModel()`, `openAiImageModel()`, `openAiTemperature()` and `openAiTimeout()`. The defaults are written there once.
 
-`OPENAI_BASE_URL` points the driver at any OpenAI-compatible endpoint, such as Azure OpenAI or a proxy. The endpoint has to support the Responses API.
+`OPENAI_BASE_URL` points the driver at another host, such as a proxy. The package appends `/responses` and `/images/generations` and sends the key as a Bearer token, so the endpoint has to accept exactly that.
 
 ## Testing
 
 Never call a real AI API from a test. Two ways:
 
-Bind a fake driver when the test is about your own code:
+Bind a fake driver when the test is about your own code. Bind it before anything resolves `AiGenerator`: the generator is a singleton and keeps the driver it was built with.
 
 ```php
 use Darvis\LaravelAiGenerator\ContentRequest;

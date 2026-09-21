@@ -1,92 +1,102 @@
 ---
-title: Installation
+title: "Installation"
 nav_order: 2
-description: "Requirements, installing darvis/laravel-ai-generator, publishing the config, setting the OpenAI key and checking that it works."
+description: "Install darvis/laravel-ai-generator step by step: requirements, the OpenAI API key, the optional config file, and a check that it works without spending money."
 ---
 
 # Installation
 
 ## Requirements
 
-Before installing, ensure your environment meets these requirements:
+- PHP 8.2 or higher. Laravel 13 itself needs PHP 8.3.
+- Laravel 11, 12 or 13.
+- An OpenAI API key. OpenAI bills every call to your OpenAI account.
 
-- PHP 8.2 or higher
-- Laravel 11, 12 or 13
-- An OpenAI API key
+The package has no migrations, routes or views, so there is nothing to migrate or to link.
 
-## Install via Composer
+## Step 1: install the package
 
 ```bash
 composer require darvis/laravel-ai-generator
 ```
 
-The package uses Laravel's auto-discovery, so the service provider will be registered automatically.
+Laravel discovers the service provider by itself. You don't register anything.
 
-## Publish Configuration
+## Step 2: set the API key
 
-Publish the configuration file to customize settings:
+Create a key in the OpenAI dashboard, under [API keys](https://platform.openai.com/api-keys), and
+put it in the `.env` file of your application:
+
+```env
+OPENAI_API_KEY=your-api-key-here
+```
+
+Keep the key out of version control: `.env` is not committed, and `.env.example` gets an empty
+value.
+
+That is the only setting you need. Every other setting has a default; see
+[Configuration](configuration.md).
+
+## Step 3 (optional): publish the config file
+
+You only need this when you want to change a setting in PHP instead of in `.env`.
 
 ```bash
 php artisan vendor:publish --tag=ai-generator-config
 ```
 
-This creates `config/ai-generator.php` in your application.
+This copies the file to `config/ai-generator.php` in your application.
 
-## Set Your API Key
+## Check that it works
 
-Add your OpenAI API key to your `.env` file:
+Do this in two steps. The first one does not call OpenAI, so it costs nothing.
 
-```env
-OPENAI_API_KEY=sk-your-api-key-here
-```
+### 1. The package is loaded and the key is read
 
-> **Security Note**: Never commit your API key to version control. Always use environment variables.
-
-## Verify Installation
-
-Test that everything works:
-
-```php
-use Darvis\LaravelAiGenerator\AiGenerator;
-use Darvis\LaravelAiGenerator\ContentRequest;
-
-$generator = app(AiGenerator::class);
-
-$result = $generator->generate(new ContentRequest(
-    topic: 'Test content generation',
-    language: 'en',
-));
-
-dd($result);
-```
-
-## Troubleshooting
-
-### "OPENAI_API_KEY is not set"
-
-Ensure your `.env` file contains the `OPENAI_API_KEY` variable and that you've cleared the config cache:
+Run this in the root of your application. Tinker is the command line that ships with a new Laravel
+application.
 
 ```bash
-php artisan config:clear
+php artisan tinker --execute="echo get_class(app(\Darvis\LaravelAiGenerator\Contracts\AiContentDriver::class)), PHP_EOL, \Darvis\LaravelAiGenerator\Support\AiGeneratorConfig::openAiApiKey() === null ? 'key missing' : 'key found', PHP_EOL;"
 ```
 
-### Connection Timeout
+You should see exactly this:
 
-If requests are timing out, increase the timeout in your `.env`:
-
-```env
-OPENAI_TIMEOUT=60
+```text
+Darvis\LaravelAiGenerator\Drivers\OpenAiDriver
+key found
 ```
 
-### Rate Limiting
+- `key missing`: the application does not see `OPENAI_API_KEY`. See
+  [Troubleshooting](troubleshooting.md#api-key-not-set).
+- `Unsupported AI driver: ...`: `AI_GENERATOR_DRIVER` holds a name the package does not know. See
+  [Troubleshooting](troubleshooting.md#unsupported-driver).
+- An error that says the interface is not instantiable or a class is not found: the service
+  provider is not loaded. Run `composer install` and then `php artisan package:discover`.
 
-If you're hitting OpenAI's rate limits, consider implementing queued jobs for content generation.
+### 2. One real call, without an image
+
+This sends one text request to OpenAI and is billed to your account. `includeImage: false` keeps it
+to one call and `maxWords: 100` keeps the text short.
+
+```bash
+php artisan tinker --execute="echo app(\Darvis\LaravelAiGenerator\AiGenerator::class)->generate(new \Darvis\LaravelAiGenerator\ContentRequest(topic: 'Why automated tests matter', language: 'en', maxWords: 100, includeImage: false))->title, PHP_EOL;"
+```
+
+After some seconds you see one line: the title the model wrote. The words differ on every run.
+
+When you see an exception instead, its message tells you what went wrong. Every message is listed
+in [Troubleshooting](troubleshooting.md).
 
 ## Laravel Boost
 
-The package ships a [Laravel Boost](https://laravel.com/docs/boost) guideline and a skill in `resources/boost/`. Run `php artisan boost:install`, or `php artisan boost:update --discover` in a project that already uses Boost, and your AI assistant knows the API, the defaults and the pitfalls: the image that is generated by default, the custom driver binding and how to test without calling OpenAI.
+The package ships a [Laravel Boost](https://laravel.com/docs/boost) guideline and a skill in
+`resources/boost/`. Run `php artisan boost:install`, or `php artisan boost:update --discover` in a
+project that already uses Boost. Your AI assistant then knows the API, the defaults and the pitfalls:
+the image that is generated by default, the custom driver binding and how to test without calling
+OpenAI.
 
-## Next Steps
+## Next steps
 
-- [Configuration](configuration.md) - Customize default settings
-- [Basic Usage](usage.md) - Learn how to generate content
+- [Usage](usage.md): a complete example and every request option.
+- [Configuration](configuration.md): change the model, the default language or the timeout.

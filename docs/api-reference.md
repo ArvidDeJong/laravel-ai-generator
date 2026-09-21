@@ -1,61 +1,69 @@
 ---
-title: API reference
-nav_order: 6
-description: "Every public class and method: AiGenerator, ContentRequest, ContentResult, the AiContentDriver contract, the facade and the exceptions."
+title: "API reference"
+nav_order: 8
+description: "Every public class and method: AiGenerator, ContentRequest, ContentResult, the AiContentDriver contract, the facade, the config accessors and exception messages."
 ---
 
-# API Reference
+# API reference
 
-## Classes
+Everything lives in the namespace `Darvis\LaravelAiGenerator`.
 
-### AiGenerator
+## AiGenerator
 
-The main service class for content generation.
+`Darvis\LaravelAiGenerator\AiGenerator`, a `final` class, bound in the container as a singleton and
+under the alias `ai-generator`.
 
-**Namespace:** `Darvis\LaravelAiGenerator`
-
-#### Methods
-
-##### generate(ContentRequest $request): ContentResult
-
-Generates AI-powered content based on the provided request.
+### generate()
 
 ```php
 public function generate(ContentRequest $request): ContentResult
 ```
 
-**Parameters:**
-- `$request` - A `ContentRequest` instance with generation parameters
+1. Fills the empty `language`, `tone`, `readingLevel` and `maxWords` of the request from the config.
+   An empty `imageStyle` becomes `photo`, an empty `imageAspect` becomes `16:9`.
+2. Calls `generate()` on the bound `AiContentDriver`.
+3. Trims `title`, `intro`, `text`, `seoTitle`, `seoDescription` and `imagePrompt`.
 
-**Returns:** `ContentResult` - The generated content
+It throws whatever the driver throws. The OpenAI driver throws a `RuntimeException`; see
+[Exceptions](#exceptions).
 
-**Throws:** `RuntimeException` - If the AI driver encounters an error
-
-**Example:**
 ```php
-$generator = app(AiGenerator::class);
-$result = $generator->generate(new ContentRequest(topic: 'Your topic'));
+use Darvis\LaravelAiGenerator\AiGenerator;
+use Darvis\LaravelAiGenerator\ContentRequest;
+
+$result = app(AiGenerator::class)->generate(new ContentRequest(
+    topic: 'Your topic',
+    includeImage: false,
+));
 ```
 
-##### generateImage(string $prompt, string $style = 'photo', string $aspect = '16:9'): array
-
-Generates only an image, without any text, and skips the text call entirely. It always calls the
-OpenAI image API with the configured `image_model`, whatever driver is configured for the text.
+### generateImage()
 
 ```php
 public function generateImage(string $prompt, string $style = 'photo', string $aspect = '16:9'): array
 ```
 
-**Parameters:**
-- `$prompt` - What the image shows, preferably in English
-- `$style` - `photo`, `illustration`, `flat` or `3d`; any other value sends the prompt unchanged
-- `$aspect` - `1:1`, `4:5` or `16:9`. Only DALL-E 3 follows it; other models return a square image
+Makes only an image. It always calls the OpenAI image API with `OPENAI_IMAGE_MODEL`, whatever driver
+is bound for the text.
 
-**Returns:** an array with `url` and `base64` (one of them filled, depending on the model), or
-`['error' => '...']`. It does not throw.
+| Argument | Values |
+| --- | --- |
+| `$prompt` | What the image shows, preferably in English. |
+| `$style` | `photo`, `illustration`, `flat` or `3d`. The style becomes a prefix of the prompt and `No text or watermarks.` is added. Any other value sends the prompt unchanged. |
+| `$aspect` | `1:1`, `4:5` or `16:9`. Only a model name that contains `dall-e-3` gets a matching size; other models get `1024x1024`. |
 
-**Example:**
+It returns an array and does not throw:
+
+- on success `['url' => ?string, 'base64' => ?string]`, one of the two filled;
+- on failure `['error' => string]`, for example `OPENAI_API_KEY is not set.`
+
+The request waits up to 120 seconds, with 30 seconds to connect, and is tried once. `OPENAI_TIMEOUT`
+does not apply here.
+
 ```php
+use Darvis\LaravelAiGenerator\AiGenerator;
+use Illuminate\Support\Facades\Log;
+
 $image = app(AiGenerator::class)->generateImage('A lighthouse at dusk', 'illustration');
 
 if (isset($image['error'])) {
@@ -63,15 +71,9 @@ if (isset($image['error'])) {
 }
 ```
 
----
+## ContentRequest
 
-### ContentRequest
-
-Immutable data transfer object for content generation requests.
-
-**Namespace:** `Darvis\LaravelAiGenerator`
-
-#### Constructor
+`Darvis\LaravelAiGenerator\ContentRequest`, a `final` class with `public readonly` properties.
 
 ```php
 public function __construct(
@@ -90,32 +92,12 @@ public function __construct(
 )
 ```
 
-#### Properties
+Use named arguments. [Usage](usage.md#every-request-option) explains every argument. Note that
+`includeImage` defaults to `true`.
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `$topic` | `string` | The main topic (required) |
-| `$language` | `?string` | ISO 639-1 language code |
-| `$audience` | `?string` | Target audience description |
-| `$tone` | `?string` | Writing tone (informal/neutral/formal) |
-| `$readingLevel` | `?string` | Complexity (simple/general/expert) |
-| `$keywords` | `?array` | SEO keywords array |
-| `$cta` | `?string` | Call-to-action text |
-| `$brand` | `?string` | Brand/organization name |
-| `$maxWords` | `?int` | Maximum word count |
-| `$includeImage` | `bool` | Generate image prompt |
-| `$imageStyle` | `?string` | Image style |
-| `$imageAspect` | `?string` | Image aspect ratio |
+## ContentResult
 
----
-
-### ContentResult
-
-Immutable data transfer object containing generated content.
-
-**Namespace:** `Darvis\LaravelAiGenerator`
-
-#### Constructor
+`Darvis\LaravelAiGenerator\ContentResult`, a `final` class with `public readonly` properties.
 
 ```php
 public function __construct(
@@ -131,130 +113,89 @@ public function __construct(
 )
 ```
 
-#### Properties
+| Method | Returns |
+| --- | --- |
+| `hasError(): bool` | `true` when `errorMessage` is not `null`. The text can still be complete. |
+| `hasImage(): bool` | `true` when `imageUrl` or `imageBase64` is not `null`. |
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `$title` | `string` | Generated title |
-| `$intro` | `string` | 2-4 sentence introduction |
-| `$text` | `string` | Main content (HTML) |
-| `$seoTitle` | `string` | SEO title (max 60 chars) |
-| `$seoDescription` | `string` | Meta description (max 155 chars) |
-| `$imagePrompt` | `?string` | English image prompt |
-| `$imageUrl` | `?string` | Generated image URL |
-| `$imageBase64` | `?string` | Base64 image data |
-| `$errorMessage` | `?string` | Error message if any |
+[Usage](usage.md#what-comes-back) explains every property.
 
-#### Methods
+## AiContentDriver
 
-##### hasError(): bool
-
-Check if the generation encountered an error.
-
-```php
-public function hasError(): bool
-```
-
-**Returns:** `true` if an error message is present
-
-##### hasImage(): bool
-
-Check if image data is available.
-
-```php
-public function hasImage(): bool
-```
-
-**Returns:** `true` if `imageUrl` or `imageBase64` is present
-
----
-
-### AiContentDriver (Interface)
-
-Contract for AI content generation drivers.
-
-**Namespace:** `Darvis\LaravelAiGenerator\Contracts`
-
-#### Methods
-
-##### generate(ContentRequest $request): ContentResult
-
-Generate content based on the request.
+`Darvis\LaravelAiGenerator\Contracts\AiContentDriver`, the interface of a driver.
 
 ```php
 public function generate(ContentRequest $request): ContentResult;
 ```
 
----
+The package binds it as a singleton to `Darvis\LaravelAiGenerator\Drivers\OpenAiDriver` when the
+config key `driver` is `openai`, and throws `Unsupported AI driver: ...` for any other name. See
+[Custom drivers](custom-drivers.md) for a driver of your own.
 
-### AiGenerator (Facade)
+`OpenAiDriver::imagePayload()` is public but marked `@internal`. Don't call it from your application.
 
-Static facade for the AiGenerator service.
+## The facade
 
-**Namespace:** `Darvis\LaravelAiGenerator\Facades`
-
-#### Methods
-
-##### generate(ContentRequest $request): ContentResult
-
-```php
-AiGenerator::generate(new ContentRequest(topic: 'Your topic'));
-```
-
-##### generateImage(string $prompt, string $style = 'photo', string $aspect = '16:9'): array
+`Darvis\LaravelAiGenerator\Facades\AiGenerator` forwards to the `AiGenerator` singleton. It has no
+global alias, so import it.
 
 ```php
+use Darvis\LaravelAiGenerator\ContentRequest;
+use Darvis\LaravelAiGenerator\Facades\AiGenerator;
+
+AiGenerator::generate(new ContentRequest(topic: 'Your topic', includeImage: false));
 AiGenerator::generateImage('A lighthouse at dusk', 'illustration', '1:1');
 ```
 
----
+## AiGeneratorConfig {#aigeneratorconfig}
 
-## Configuration
+`Darvis\LaravelAiGenerator\Support\AiGeneratorConfig` is the one class that reads the package config.
+Every method is static.
 
-### Config File: `config/ai-generator.php`
+| Method | Returns | Config key | Default |
+| --- | --- | --- | --- |
+| `driver()` | `string` | `driver` | `openai` |
+| `defaultLanguage()` | `string` | `default_language` | `nl` |
+| `defaultMaxWords()` | `int` | `defaults.max_words` | `900` |
+| `defaultReadingLevel()` | `string` | `defaults.reading_level` | `general` |
+| `defaultTone()` | `string` | `defaults.tone` | `informal` |
+| `openAiApiKey()` | `?string` | `drivers.openai.api_key` | `null`, also for an empty string |
+| `openAiBaseUrl()` | `string` | `drivers.openai.base_url` | `https://api.openai.com/v1`, without a trailing slash |
+| `openAiImageModel()` | `string` | `drivers.openai.image_model` | `gpt-image-1` |
+| `openAiModel()` | `string` | `drivers.openai.model` | `gpt-4.1-mini` |
+| `openAiTemperature()` | `float` | `drivers.openai.temperature` | `0.7` |
+| `openAiTimeout()` | `int` | `drivers.openai.timeout` | `45` |
 
-```php
-return [
-    'default_language' => env('AI_GENERATOR_LANGUAGE', 'nl'),
+[Configuration](configuration.md) has the environment variable of every key.
 
-    'defaults' => [
-        'max_words' => env('AI_GENERATOR_MAX_WORDS', 900),
-        'reading_level' => env('AI_GENERATOR_LEVEL', 'general'),
-        'tone' => env('AI_GENERATOR_TONE', 'informal'),
-    ],
+## The service provider
 
-    'driver' => env('AI_GENERATOR_DRIVER', 'openai'),
+`Darvis\LaravelAiGenerator\AiGeneratorServiceProvider` is discovered by Laravel. It merges the config
+under the key `ai-generator`, registers the two singletons and the alias, and offers one publish tag:
 
-    'drivers' => [
-        'openai' => [
-            'api_key' => env('OPENAI_API_KEY'),
-            'base_url' => env('OPENAI_BASE_URL', 'https://api.openai.com/v1'),
-            'image_model' => env('OPENAI_IMAGE_MODEL', 'gpt-image-1'),
-            'model' => env('OPENAI_MODEL', 'gpt-4.1-mini'),
-            'temperature' => env('OPENAI_TEMPERATURE', 0.7),
-            'timeout' => env('OPENAI_TIMEOUT', 45),
-        ],
-    ],
-];
+```bash
+php artisan vendor:publish --tag=ai-generator-config
 ```
 
----
+The package has no routes, views, migrations, commands, events or translations.
 
 ## Exceptions
 
-### RuntimeException
+The package has no exception classes of its own. The OpenAI driver and the service provider throw
+PHP's `RuntimeException` with these messages:
 
-Thrown when:
-- `OPENAI_API_KEY` is not configured
-- API connection fails
-- API returns an error response
-- Response cannot be parsed
+| Message | When |
+| --- | --- |
+| `OPENAI_API_KEY is not set.` | The API key is empty. Nothing was sent. |
+| `OpenAI connection failed: ...` | No connection or a timeout on the text request, on both attempts. |
+| `OpenAI request failed: ...` | A 4xx or 5xx status on the text request, on both attempts. |
+| `OpenAI returned non-JSON output (unexpected).` | The text of the answer is not a JSON object. |
+| `OpenAI response did not include output_text.` | The answer has no `output_text` item. |
+| `Unsupported AI driver: ...` | The config key `driver` is not `openai` and the binding was not replaced. |
 
-**Example handling:**
-```php
-try {
-    $result = $generator->generate($request);
-} catch (RuntimeException $e) {
-    Log::error('AI generation failed: ' . $e->getMessage());
-}
-```
+The previous exception, from Laravel's HTTP client, is available through `getPrevious()` for the
+connection and request failures.
+
+A failing image inside `generate()` does not throw. The result has `errorMessage` set to
+`OpenAI Image Error: ...`. [Troubleshooting](troubleshooting.md) has the cause and the fix of every
+message.

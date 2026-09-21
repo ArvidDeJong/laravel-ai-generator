@@ -18,7 +18,7 @@ package:
   license_url: https://github.com/ArvidDeJong/laravel-ai-generator/blob/main/LICENSE
   requires: "PHP 8.2+, Laravel 11, 12 or 13, an OpenAI API key"
   platforms: [Laravel]
-  keywords: [laravel, ai, openai, gpt, content generation, seo, blog posts, meta description, image generation, dall-e]
+  keywords: [laravel, openai, ai content generation, ai text generator, blog post generator, seo title, meta description, image generation, openai responses api, laravel boost]
 
 # Developer credit in the footer and the structured data.
 developer:

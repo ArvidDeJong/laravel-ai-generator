@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Documentation, custom drivers:** the example driver read its settings from
+  `config('ai-generator.drivers.anthropic...')` and hard coded a model name and an API version of a
+  third party. A driver of your own keeps its settings in your application, for example
+  `config/services.php`; the page now shows a made up provider with placeholders, and says that the
+  package makes no image for a custom driver.
+- **Documentation, retries:** the Boost skill said a text call fails "after 2 retries". The OpenAI
+  driver makes two attempts in total, 250 milliseconds apart, for the text and for the image inside
+  `generate()`. `generateImage()` makes one attempt.
+- **Documentation, timeouts:** `OPENAI_TIMEOUT` was described as "request timeout". It counts per
+  attempt, for the text and for the image inside `generate()`; `generateImage()` ignores it and uses
+  a fixed 120 seconds.
+- **Documentation, Azure OpenAI:** the configuration page and the Boost skill said that pointing
+  `OPENAI_BASE_URL` at an Azure deployment works. That was never tested. The package appends
+  `/responses` and `/images/generations` and sends the key as a Bearer token; the pages now say only
+  that.
+- **Documentation, custom driver name:** the Boost skill said not to set `AI_GENERATOR_DRIVER` to
+  your own name, while the docs and a test do exactly that. It works as long as your binding replaces
+  the one of the package.
+- **Documentation, verify step:** the installation page checked the installation with a request that
+  also generated an image. The check now starts with a step that does not call OpenAI, followed by
+  one text request with `includeImage: false`.
+- `AI_GENERATOR_DRIVER` was missing from the table of environment variables.
+- Claims the package cannot guarantee are gone or reworded: that an image URL expires, which field
+  `gpt-image-1` fills, how many seconds a call takes, and the SEO field lengths, which are an
+  instruction to the model and not a limit the package enforces.
+- Two checks in `tests/DocsSiteTest.php` always passed: a message passed as second argument to a
+  negated `toContain()` counts as a second needle. They now fail on `{{ }}` outside a raw block and
+  on a relative link out of `docs/`.
+- The facade has no global alias; the usage page now says to import it, and that the facade and the
+  service class share the name `AiGenerator`.
+
+### Added
+- Documentation: a [testing](https://arviddejong.github.io/laravel-ai-generator/testing.html) page
+  with a fake driver, `Http::fake()` in the shape of the Responses API and a test for a custom driver.
+- Documentation: a [troubleshooting](https://arviddejong.github.io/laravel-ai-generator/troubleshooting.html)
+  page with every message the package produces, its cause and its fix.
+- The usage page starts with one complete, runnable example (an Artisan command), and the API
+  reference lists the `AiGeneratorConfig` accessors and every exception message.
+- Two guards in `tests/DocsSiteTest.php`: links between pages resolve and every page is linked from
+  the home page, and the first examples show `includeImage: false`.
+
 ## [1.1.1] - 2026-09-21
 
 ### Added

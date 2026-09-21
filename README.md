@@ -5,35 +5,29 @@
 [![PHP version](https://img.shields.io/packagist/dependency-v/darvis/laravel-ai-generator/php.svg)](https://packagist.org/packages/darvis/laravel-ai-generator)
 [![License](https://img.shields.io/packagist/l/darvis/laravel-ai-generator.svg)](LICENSE)
 
-AI-powered content generation service for Laravel applications. Generate blog posts, articles, news items, and more with SEO optimization and optional image generation.
+`darvis/laravel-ai-generator` writes structured content for a Laravel application with OpenAI. You pass a `ContentRequest` with a topic and get a `ContentResult` with a title, an intro, the main text as HTML, an SEO title, a meta description and optionally an image.
 
 ## Features
 
-- 🤖 **OpenAI Integration** - Uses GPT models for high-quality content
-- 📝 **Structured Output** - Title, intro, text, SEO title, SEO description
-- 🖼️ **Image Generation** - Optional AI-generated hero images
-- 🌍 **Multi-language** - Support for Dutch, English, German, French, and more
-- 🎯 **SEO Optimized** - Automatic SEO title and meta description
-- ⚙️ **Configurable** - Tone, reading level, max words, and more
-- 🔌 **Driver-based** - Easy to extend with new AI providers
-- 🤖 **Laravel Boost** - Guideline and skill included, so an AI assistant in your app knows the API
+- One call returns `title`, `intro`, `text` (HTML with `h2`, `p`, `ul` and `li`), `seoTitle` and `seoDescription`.
+- Asks the OpenAI Responses API for strict JSON, so you get separate fields instead of one text to parse.
+- Optional image through the OpenAI image API, and `generateImage()` for an image without text.
+- Language, tone, reading level, audience, keywords, brand, call to action and length per request, with defaults in the config.
+- A failing image does not lose the text: the result comes back with `hasError()` true.
+- Another AI provider for the text through your own `AiContentDriver`.
+- No routes, views or migrations: you call it from your own code and store the result yourself.
+- Ships a Laravel Boost guideline and skill, so an AI assistant in your application knows the API.
 
 ## Requirements
 
-- PHP 8.2+
+- PHP 8.2 or higher (Laravel 13 itself needs PHP 8.3)
 - Laravel 11, 12 or 13
-- OpenAI API key
+- An OpenAI API key; OpenAI bills every call to your OpenAI account
 
 ## Installation
 
 ```bash
 composer require darvis/laravel-ai-generator
-```
-
-Publish the configuration file:
-
-```bash
-php artisan vendor:publish --tag=ai-generator-config
 ```
 
 Add your OpenAI API key to `.env`:
@@ -42,36 +36,49 @@ Add your OpenAI API key to `.env`:
 OPENAI_API_KEY=your-api-key-here
 ```
 
-## Quick Start
+Publishing the config file is optional:
+
+```bash
+php artisan vendor:publish --tag=ai-generator-config
+```
+
+## Quick start
 
 ```php
-use Darvis\LaravelAiGenerator\AiGenerator;
 use Darvis\LaravelAiGenerator\ContentRequest;
+use Darvis\LaravelAiGenerator\Facades\AiGenerator;
 
-$generator = app(AiGenerator::class);
-
-$result = $generator->generate(new ContentRequest(
+$result = AiGenerator::generate(new ContentRequest(
     topic: 'The benefits of Laravel for web development',
     language: 'en',
+    includeImage: false,
 ));
 
-// Access the generated content
-echo $result->title;           // "Why Laravel is the Best PHP Framework"
-echo $result->intro;           // "Laravel has revolutionized..."
-echo $result->text;            // "<h2>Introduction</h2><p>..."
-echo $result->seoTitle;        // "Laravel Benefits | Web Development"
-echo $result->seoDescription;  // "Discover why Laravel..."
+$result->title;           // the headline
+$result->intro;           // two to four sentences, plain text
+$result->text;            // the article as HTML
+$result->seoTitle;        // the model is asked for at most 60 characters
+$result->seoDescription;  // the model is asked for at most 155 characters
 ```
+
+`includeImage` is `true` by default. Leave out `includeImage: false` and the package also generates an image, which is a second, billed call to OpenAI. The `text` field is HTML written by a model: sanitise it before you render it unescaped.
 
 ## Documentation
 
 The full documentation lives on the [documentation site](https://arviddejong.github.io/laravel-ai-generator/):
 
-- [Installation](https://arviddejong.github.io/laravel-ai-generator/installation.html)
+- [Installation](https://arviddejong.github.io/laravel-ai-generator/installation.html): step by step, with a check that costs nothing
+- [Usage](https://arviddejong.github.io/laravel-ai-generator/usage.html): a complete example, every request option, images, errors and queued jobs
 - [Configuration](https://arviddejong.github.io/laravel-ai-generator/configuration.html): every option and environment variable
-- [Usage](https://arviddejong.github.io/laravel-ai-generator/usage.html): requests, results, images, queued jobs and error handling
-- [Custom drivers](https://arviddejong.github.io/laravel-ai-generator/custom-drivers.html): plug in another AI provider
-- [API reference](https://arviddejong.github.io/laravel-ai-generator/api-reference.html)
+- [Custom drivers](https://arviddejong.github.io/laravel-ai-generator/custom-drivers.html): let another AI provider write the text
+- [Testing](https://arviddejong.github.io/laravel-ai-generator/testing.html): test your code without calling OpenAI
+- [Troubleshooting](https://arviddejong.github.io/laravel-ai-generator/troubleshooting.html): every error message with cause and fix
+- [API reference](https://arviddejong.github.io/laravel-ai-generator/api-reference.html): every public class and method
+- [FAQ](https://arviddejong.github.io/laravel-ai-generator/faq.html): the short answers
+
+## Laravel Boost
+
+The package ships a [Laravel Boost](https://laravel.com/docs/boost) guideline and skill. Run `php artisan boost:install`, or `php artisan boost:update --discover` in a project that already uses Boost.
 
 ## Testing
 

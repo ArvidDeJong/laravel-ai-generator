@@ -1,5 +1,5 @@
 ---
-title: Home
+title: "Home"
 nav_order: 1
 description: "darvis/laravel-ai-generator writes structured content for a Laravel app with OpenAI: title, intro, HTML text, SEO fields and an optional image from one request."
 permalink: /
@@ -7,21 +7,39 @@ permalink: /
 
 # Laravel AI Generator
 
-Writing a first draft of a blog post, a product text or a news item is the part of a CMS that an AI
-model does well. This package turns that into one call: you describe the topic, it returns the
-fields a page needs, already split up and trimmed.
+`darvis/laravel-ai-generator` turns a topic into the fields a web page needs, with one call to OpenAI.
+You pass a `ContentRequest`, you get a `ContentResult` with a title, an intro, the main text as HTML,
+an SEO title, a meta description and, if you want one, an image.
+
+It is for Laravel developers who build a CMS, a blog or a web shop and want a first draft of a text
+without writing prompts and parsing API responses themselves.
+
+## What it does not do
+
+- It has no routes, views, migrations or screens. You call it from your own code.
+- It does not save anything. You store the result, and the image, yourself.
+- It does not sanitise the generated HTML. See [Usage](usage.md#sanitise-html).
+- It does not queue anything by itself. See [Usage](usage.md#queued-job).
+
+## Requirements
+
+- PHP 8.2 or higher (Laravel 13 itself needs PHP 8.3)
+- Laravel 11, 12 or 13
+- An OpenAI API key. OpenAI bills every call to your OpenAI account; the package is free.
+
+## Install
 
 ```bash
 composer require darvis/laravel-ai-generator
 ```
 
-```dotenv
+```env
 OPENAI_API_KEY=your-api-key-here
 ```
 
-Requires PHP 8.2 or higher, Laravel 11, 12 or 13, and an OpenAI API key.
+Then follow [Check that it works](installation.md#check-that-it-works).
 
-## Your first article
+## In short
 
 ```php
 use Darvis\LaravelAiGenerator\ContentRequest;
@@ -36,27 +54,25 @@ $result = AiGenerator::generate(new ContentRequest(
 $result->title;           // the headline
 $result->intro;           // two to four sentences, plain text
 $result->text;            // the article as HTML: h2, p, ul and li
-$result->seoTitle;        // at most 60 characters
-$result->seoDescription;  // at most 155 characters
+$result->seoTitle;        // the model is asked for at most 60 characters
+$result->seoDescription;  // the model is asked for at most 155 characters
 ```
 
-Leave out `includeImage: false` and it also writes an image prompt and generates the image, which
-is a second call to OpenAI.
+**`includeImage` is `true` by default.** Leave out `includeImage: false` and the package also
+generates an image, which is a second, billed call to OpenAI.
 
-## What you can steer
+## Pages
 
-- **Language and tone**: any language, with informal, neutral or formal tone, and the right form of
-  address for Dutch, German and French.
-- **Reading level and length**: simple, general or expert, and a word limit for the main text.
-- **Audience, brand, keywords and a call to action**, woven into the text.
-- **The image**: photo, illustration, flat or 3D.
-- **The provider**: OpenAI out of the box, or your own driver for another model.
-
-## Where to go next
-
-- [Installation](installation.md): requirements, publishing the config and checking the key.
-- [Configuration](configuration.md): every option and environment variable.
-- [Usage](usage.md): requests, results, images, queued jobs and error handling.
-- [Custom drivers](custom-drivers.md): plug in another AI provider.
-- [API reference](api-reference.md): every class and method.
+- [Installation](installation.md): from `composer require` to a first result, and a check that costs nothing.
+- [Usage](usage.md): one complete example, every request option, the result, images, errors and queued jobs.
+- [Configuration](configuration.md): every config key and environment variable with its default.
+- [Custom drivers](custom-drivers.md): let another AI provider write the text.
+- [Testing](testing.md): test your own code without calling OpenAI.
+- [Troubleshooting](troubleshooting.md): every error message the package produces, with cause and fix.
+- [API reference](api-reference.md): every public class, method and exception message.
 - [FAQ](faq.md): the short answers.
+
+## Links
+
+- [Source on GitHub](https://github.com/ArvidDeJong/laravel-ai-generator)
+- [Package on Packagist](https://packagist.org/packages/darvis/laravel-ai-generator)
