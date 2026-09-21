@@ -16,7 +16,7 @@ AI-powered content generation service for Laravel applications. Generate blog po
 - 🎯 **SEO Optimized** - Automatic SEO title and meta description
 - ⚙️ **Configurable** - Tone, reading level, max words, and more
 - 🔌 **Driver-based** - Easy to extend with new AI providers
-- 🤖 **Laravel Boost** - Guideline included, so an AI assistant in your app knows the API
+- 🤖 **Laravel Boost** - Guideline and skill included, so an AI assistant in your app knows the API
 
 ## Requirements
 
