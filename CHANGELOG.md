@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-09-21
+
 ### Fixed
 - **Documentation, custom drivers:** the example driver read its settings from
   `config('ai-generator.drivers.anthropic...')` and hard coded a model name and an API version of a
