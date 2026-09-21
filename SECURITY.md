@@ -1,44 +1,28 @@
-# Security Policy
+# Security policy
 
-## Supported Versions
+This package sends your OpenAI API key and your content to an external API, so a way to leak the
+key, to send it to another host than the configured one, or to get unexpected markup into the
+generated HTML counts as a security issue.
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 1.x     | :white_check_mark: |
+## Supported versions
 
-## Reporting a Vulnerability
+Only the latest minor release of 1.x receives security fixes. Upgrade before reporting.
 
-If you discover a security vulnerability within this package, please send an email to Arvid de Jong at info@arvid.nl.
+## Reporting a vulnerability
 
-All security vulnerabilities will be promptly addressed.
+Please do **not** open a public issue. Report it privately instead:
 
-### What to Include
+- via [GitHub private vulnerability reporting](https://github.com/ArvidDeJong/laravel-ai-generator/security/advisories/new), or
+- by email to info@arvid.nl.
 
-Please include the following information in your report:
+Include the package version, the Laravel version, the driver and model, and the steps that show the
+problem. Leave your API key out.
 
-- A description of the vulnerability
-- Steps to reproduce the issue
-- Possible impact of the vulnerability
-- Any potential solutions you've identified
+You will get a reply within a week. Once a fix is released, the advisory is published and you are
+credited, unless you prefer not to be.
 
-### Response Timeline
+## Out of scope
 
-- **Initial Response**: Within 48 hours
-- **Status Update**: Within 7 days
-- **Resolution**: Depends on complexity, but we aim for 30 days or less
-
-### Disclosure Policy
-
-- We will acknowledge receipt of your vulnerability report
-- We will send you regular updates about our progress
-- We will notify you when the vulnerability is fixed
-- We will publicly acknowledge your responsible disclosure (unless you prefer to remain anonymous)
-
-## Best Practices for Users
-
-1. **Never commit API keys** - Always use environment variables for sensitive data
-2. **Keep dependencies updated** - Regularly run `composer update` to get security patches
-3. **Use HTTPS** - Ensure all API communications use HTTPS
-4. **Validate input** - Always validate user input before passing it to the generator
-
-Thank you for helping keep this package and its users safe!
+The `text` field is HTML written by a language model. Treat it as untrusted input and sanitise it
+before you render it unescaped; that the model can be asked to produce any markup is how language
+models work, not a vulnerability in this package.

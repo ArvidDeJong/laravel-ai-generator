@@ -1,3 +1,9 @@
+---
+title: API reference
+nav_order: 6
+description: "Every public class and method: AiGenerator, ContentRequest, ContentResult, the AiContentDriver contract, the facade and the exceptions."
+---
+
 # API Reference
 
 ## Classes
@@ -29,6 +35,32 @@ public function generate(ContentRequest $request): ContentResult
 ```php
 $generator = app(AiGenerator::class);
 $result = $generator->generate(new ContentRequest(topic: 'Your topic'));
+```
+
+##### generateImage(string $prompt, string $style = 'photo', string $aspect = '16:9'): array
+
+Generates only an image, without any text, and skips the text call entirely. It always calls the
+OpenAI image API with the configured `image_model`, whatever driver is configured for the text.
+
+```php
+public function generateImage(string $prompt, string $style = 'photo', string $aspect = '16:9'): array
+```
+
+**Parameters:**
+- `$prompt` - What the image shows, preferably in English
+- `$style` - `photo`, `illustration`, `flat` or `3d`; any other value sends the prompt unchanged
+- `$aspect` - `1:1`, `4:5` or `16:9`. Only DALL-E 3 follows it; other models return a square image
+
+**Returns:** an array with `url` and `base64` (one of them filled, depending on the model), or
+`['error' => '...']`. It does not throw.
+
+**Example:**
+```php
+$image = app(AiGenerator::class)->generateImage('A lighthouse at dusk', 'illustration');
+
+if (isset($image['error'])) {
+    Log::warning($image['error']);
+}
 ```
 
 ---
@@ -169,6 +201,12 @@ Static facade for the AiGenerator service.
 AiGenerator::generate(new ContentRequest(topic: 'Your topic'));
 ```
 
+##### generateImage(string $prompt, string $style = 'photo', string $aspect = '16:9'): array
+
+```php
+AiGenerator::generateImage('A lighthouse at dusk', 'illustration', '1:1');
+```
+
 ---
 
 ## Configuration
@@ -177,21 +215,22 @@ AiGenerator::generate(new ContentRequest(topic: 'Your topic'));
 
 ```php
 return [
-    'driver' => env('AI_GENERATOR_DRIVER', 'openai'),
     'default_language' => env('AI_GENERATOR_LANGUAGE', 'nl'),
 
     'defaults' => [
-        'tone' => env('AI_GENERATOR_TONE', 'informal'),
-        'reading_level' => env('AI_GENERATOR_LEVEL', 'general'),
         'max_words' => env('AI_GENERATOR_MAX_WORDS', 900),
+        'reading_level' => env('AI_GENERATOR_LEVEL', 'general'),
+        'tone' => env('AI_GENERATOR_TONE', 'informal'),
     ],
+
+    'driver' => env('AI_GENERATOR_DRIVER', 'openai'),
 
     'drivers' => [
         'openai' => [
             'api_key' => env('OPENAI_API_KEY'),
             'base_url' => env('OPENAI_BASE_URL', 'https://api.openai.com/v1'),
-            'model' => env('OPENAI_MODEL', 'gpt-4.1-mini'),
             'image_model' => env('OPENAI_IMAGE_MODEL', 'gpt-image-1'),
+            'model' => env('OPENAI_MODEL', 'gpt-4.1-mini'),
             'temperature' => env('OPENAI_TEMPERATURE', 0.7),
             'timeout' => env('OPENAI_TIMEOUT', 45),
         ],

@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Facade;
  * Provides static access to the AiGenerator instance for convenient usage.
  *
  * @method static \Darvis\LaravelAiGenerator\ContentResult generate(\Darvis\LaravelAiGenerator\ContentRequest $request) Generate AI content from a request
+ * @method static array{url?: string|null, base64?: string|null, error?: string} generateImage(string $prompt, string $style = 'photo', string $aspect = '16:9') Generate only an image
  *
  * @example
  * ```php

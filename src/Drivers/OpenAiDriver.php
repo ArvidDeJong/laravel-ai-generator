@@ -5,9 +5,9 @@ namespace Darvis\LaravelAiGenerator\Drivers;
 use Darvis\LaravelAiGenerator\ContentRequest;
 use Darvis\LaravelAiGenerator\ContentResult;
 use Darvis\LaravelAiGenerator\Contracts\AiContentDriver;
+use Darvis\LaravelAiGenerator\Support\AiGeneratorConfig;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
@@ -35,23 +35,23 @@ final class OpenAiDriver implements AiContentDriver
      * 2. Optional image generation using DALL-E or GPT-Image
      *
      * @param  ContentRequest  $request  The content generation parameters
-     * @return ContentResult  The generated content with all fields
+     * @return ContentResult The generated content with all fields
      *
-     * @throws RuntimeException  If the API key is missing or API calls fail
+     * @throws RuntimeException If the API key is missing or API calls fail
      */
     public function generate(ContentRequest $request): ContentResult
     {
-        $cfg = Config::get('ai-generator.drivers.openai');
+        $apiKey = AiGeneratorConfig::openAiApiKey();
 
-        if (empty($cfg['api_key'])) {
+        if ($apiKey === null) {
             throw new RuntimeException('OPENAI_API_KEY is not set.');
         }
 
         $schema = $this->jsonSchema();
-        $prompt = $this->buildPrompt($request, $cfg);
+        $prompt = $this->buildPrompt($request);
 
         // 1) Generate text output as strict JSON
-        $json = $this->callText($cfg, $prompt, $schema);
+        $json = $this->callText($apiKey, $prompt, $schema);
 
         $result = new ContentResult(
             title: (string) ($json['title'] ?? ''),
@@ -64,7 +64,7 @@ final class OpenAiDriver implements AiContentDriver
 
         // 2) Optional: generate actual image (URL/base64)
         if ($request->includeImage && ! empty($result->imagePrompt)) {
-            $image = $this->callImage($cfg, $result->imagePrompt, $request->imageAspect ?? '16:9');
+            $image = $this->callImage($apiKey, $result->imagePrompt, $request->imageAspect ?? '16:9');
 
             if (! empty($image['error'])) {
                 return new ContentResult(
@@ -98,26 +98,25 @@ final class OpenAiDriver implements AiContentDriver
      *
      * Uses the Responses API with JSON schema enforcement for structured output.
      *
-     * @param  array<string, mixed>  $cfg  Driver configuration
+     * @param  string  $apiKey  The OpenAI API key
      * @param  string  $prompt  The generation prompt
      * @param  array<string, mixed>  $schema  JSON schema for response validation
-     * @return array<string, mixed>  Decoded JSON response
+     * @return array<string, mixed> Decoded JSON response
      *
-     * @throws RuntimeException  On connection or request failure
+     * @throws RuntimeException On connection or request failure
      */
-    private function callText(array $cfg, string $prompt, array $schema): array
+    private function callText(string $apiKey, string $prompt, array $schema): array
     {
-        $baseUrl = rtrim((string) $cfg['base_url'], '/');
-        $url = $baseUrl.'/responses';
+        $url = AiGeneratorConfig::openAiBaseUrl().'/responses';
 
         try {
-            $response = Http::timeout((int) ($cfg['timeout'] ?? 45))
+            $response = Http::timeout(AiGeneratorConfig::openAiTimeout())
                 ->retry(2, 250)
-                ->withToken((string) $cfg['api_key'])
+                ->withToken($apiKey)
                 ->acceptJson()
                 ->asJson()
                 ->post($url, [
-                    'model' => (string) ($cfg['model'] ?? 'gpt-4.1-mini'),
+                    'model' => AiGeneratorConfig::openAiModel(),
                     'input' => [
                         [
                             'role' => 'user',
@@ -126,7 +125,7 @@ final class OpenAiDriver implements AiContentDriver
                             ],
                         ],
                     ],
-                    'temperature' => (float) ($cfg['temperature'] ?? 0.7),
+                    'temperature' => AiGeneratorConfig::openAiTemperature(),
 
                     // Force JSON output
                     'text' => [
@@ -163,58 +162,22 @@ final class OpenAiDriver implements AiContentDriver
     /**
      * Call OpenAI's image generation API.
      *
-     * Supports both DALL-E and GPT-Image models with appropriate size mapping.
-     *
-     * @param  array<string, mixed>  $cfg  Driver configuration
+     * @param  string  $apiKey  The OpenAI API key
      * @param  string  $prompt  The image generation prompt (in English)
      * @param  string  $aspect  Desired aspect ratio (1:1, 4:5, 16:9)
-     * @return array{url?: string, b64_json?: string, error?: string}  Image data or error
+     * @return array{url?: string|null, b64_json?: string|null, error?: string} Image data or error
      */
-    private function callImage(array $cfg, string $prompt, string $aspect): array
+    private function callImage(string $apiKey, string $prompt, string $aspect): array
     {
-        $imageModel = strtolower((string) ($cfg['image_model'] ?? 'gpt-image-1'));
-
-        if (str_contains($imageModel, 'dall-e-3')) {
-            $size = match ($aspect) {
-                '1:1' => '1024x1024',
-                '4:5' => '1024x1792',
-                '16:9', '4:3' => '1792x1024',
-                default => '1792x1024',
-            };
-        } else {
-            $size = match ($aspect) {
-                '1:1' => '1024x1024',
-                '4:5' => '1024x1024',
-                '16:9', '4:3' => '1024x1024',
-                default => '1024x1024',
-            };
-        }
-
-        $baseUrl = rtrim((string) $cfg['base_url'], '/');
-        $url = $baseUrl.'/images/generations';
+        $url = AiGeneratorConfig::openAiBaseUrl().'/images/generations';
 
         try {
-            /** @var \Illuminate\Http\Client\Response $response */
-            $imageModel = (string) ($cfg['image_model'] ?? 'gpt-image-1');
-
-            // Build request payload based on model
-            $payload = [
-                'model' => $imageModel,
-                'prompt' => $prompt,
-                'size' => $size,
-            ];
-
-            // Only DALL-E models support response_format parameter
-            if (str_contains(strtolower($imageModel), 'dall-e')) {
-                $payload['response_format'] = 'b64_json';
-            }
-
-            $response = Http::timeout((int) ($cfg['timeout'] ?? 60))
+            $response = Http::timeout(AiGeneratorConfig::openAiTimeout())
                 ->retry(2, 250)
-                ->withToken((string) $cfg['api_key'])
+                ->withToken($apiKey)
                 ->acceptJson()
                 ->asJson()
-                ->post($url, $payload);
+                ->post($url, self::imagePayload($prompt, $aspect));
 
             $response->throw();
 
@@ -233,12 +196,49 @@ final class OpenAiDriver implements AiContentDriver
     }
 
     /**
+     * The request body for OpenAI's image generation API, shared with AiGenerator::generateImage().
+     *
+     * DALL-E 3 gets a size that follows the aspect ratio and is asked for base64 output; other
+     * models get a square image and their own default response format.
+     *
+     * @internal
+     *
+     * @return array<string, string>
+     */
+    public static function imagePayload(string $prompt, string $aspect): array
+    {
+        $imageModel = AiGeneratorConfig::openAiImageModel();
+        $normalized = strtolower($imageModel);
+
+        $size = str_contains($normalized, 'dall-e-3')
+            ? match ($aspect) {
+                '1:1' => '1024x1024',
+                '4:5' => '1024x1792',
+                default => '1792x1024',
+            }
+        : '1024x1024';
+
+        $payload = [
+            'model' => $imageModel,
+            'prompt' => $prompt,
+            'size' => $size,
+        ];
+
+        // Only DALL-E models support the response_format parameter
+        if (str_contains($normalized, 'dall-e')) {
+            $payload['response_format'] = 'b64_json';
+        }
+
+        return $payload;
+    }
+
+    /**
      * Extract the output text from OpenAI's Responses API format.
      *
      * @param  array<string, mixed>  $data  The API response data
-     * @return string  The extracted text content
+     * @return string The extracted text content
      *
-     * @throws RuntimeException  If no output_text is found in the response
+     * @throws RuntimeException If no output_text is found in the response
      */
     private function extractOutputText(array $data): string
     {
@@ -262,21 +262,20 @@ final class OpenAiDriver implements AiContentDriver
      * language-specific instructions, and output format requirements.
      *
      * @param  ContentRequest  $r  The content request
-     * @param  array<string, mixed>  $cfg  Driver configuration
-     * @return string  The complete prompt for the AI model
+     * @return string The complete prompt for the AI model
      */
-    private function buildPrompt(ContentRequest $r, array $cfg): string
+    private function buildPrompt(ContentRequest $r): string
     {
         $keywords = $r->keywords ? implode(', ', $r->keywords) : '';
         $brand = $r->brand ? "Brand/organization: {$r->brand}\n" : '';
         $audience = $r->audience ? "Target audience: {$r->audience}\n" : '';
         $cta = $r->cta ? "CTA: {$r->cta}\n" : '';
 
-        $tone = $r->tone ?? 'informal';
-        $reading = $r->readingLevel ?? 'general';
-        $language = $r->language ?? 'nl';
+        $tone = $r->tone ?? AiGeneratorConfig::defaultTone();
+        $reading = $r->readingLevel ?? AiGeneratorConfig::defaultReadingLevel();
+        $language = $r->language ?? AiGeneratorConfig::defaultLanguage();
 
-        $maxWords = $r->maxWords ?? 900;
+        $maxWords = $r->maxWords ?? AiGeneratorConfig::defaultMaxWords();
 
         $imagePart = $r->includeImage
             ? "Also create an 'image_prompt' (in English) for a {$r->imageStyle} hero image in aspect {$r->imageAspect}. No text in the image.\n"
@@ -318,7 +317,7 @@ PROMPT;
      *
      * @param  string  $language  ISO 639-1 language code
      * @param  string  $tone  The desired tone (informal, neutral, formal)
-     * @return string  Language-specific instructions or empty string
+     * @return string Language-specific instructions or empty string
      */
     private function getLanguageInstructions(string $language, string $tone): string
     {
@@ -335,7 +334,7 @@ PROMPT;
      *
      * Defines the expected response structure for OpenAI's JSON mode.
      *
-     * @return array<string, mixed>  JSON schema definition
+     * @return array<string, mixed> JSON schema definition
      */
     private function jsonSchema(): array
     {

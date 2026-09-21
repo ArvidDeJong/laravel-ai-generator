@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security issue
+    url: https://github.com/ArvidDeJong/laravel-ai-generator/security/advisories/new
+    about: Report a vulnerability privately, for example a way to leak the API key.
+  - name: Documentation
+    url: https://arviddejong.github.io/laravel-ai-generator/
+    about: Installation, configuration, usage and custom drivers.

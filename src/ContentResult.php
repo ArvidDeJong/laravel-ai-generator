@@ -53,7 +53,7 @@ final class ContentResult
      * Note: An error may be present even with valid content if, for example,
      * the text generation succeeded but image generation failed.
      *
-     * @return bool  True if an error message is present
+     * @return bool True if an error message is present
      */
     public function hasError(): bool
     {
@@ -65,7 +65,7 @@ final class ContentResult
      *
      * Returns true if either a URL or base64-encoded image is available.
      *
-     * @return bool  True if image data is present
+     * @return bool True if image data is present
      */
     public function hasImage(): bool
     {

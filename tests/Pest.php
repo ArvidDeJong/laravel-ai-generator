@@ -1,5 +1,7 @@
 <?php
 
+use Darvis\LaravelAiGenerator\Tests\TestCase;
+
 /*
 |--------------------------------------------------------------------------
 | Test Case
@@ -13,7 +15,7 @@
 */
 
 uses(
-    Darvis\LaravelAiGenerator\Tests\TestCase::class,
+    TestCase::class,
 )->in('Feature');
 
 /*

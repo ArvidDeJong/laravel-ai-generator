@@ -1,3 +1,9 @@
+---
+title: Usage
+nav_order: 4
+description: "Building a ContentRequest, reading the ContentResult, generating only an image, handling errors and generating in queued jobs."
+---
+
 # Basic Usage
 
 ## Getting the Generator
@@ -182,6 +188,29 @@ foreach ($languages as $lang) {
     ));
 }
 ```
+
+## Only an Image
+
+When you only need an image, `generateImage()` skips the text call:
+
+```php
+$image = app(AiGenerator::class)->generateImage(
+    'A lighthouse at dusk',
+    style: 'illustration',   // photo, illustration, flat or 3d
+    aspect: '16:9',          // only DALL-E 3 follows it; other models return a square image
+);
+
+if (isset($image['error'])) {
+    // Nothing is thrown: the error comes back in the array
+    Log::warning($image['error']);
+} else {
+    $data = $image['base64'] ?? null;  // gpt-image-1 returns base64
+    $url = $image['url'] ?? null;      // some DALL-E setups return a URL
+}
+```
+
+It always uses the OpenAI image API and `OPENAI_IMAGE_MODEL`, whatever driver you configured for
+the text.
 
 ## Error Handling
 
