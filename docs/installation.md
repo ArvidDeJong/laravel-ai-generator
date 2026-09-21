@@ -1,3 +1,9 @@
+---
+title: Installation
+nav_order: 2
+description: "Requirements, installing darvis/laravel-ai-generator, publishing the config, setting the OpenAI key and checking that it works."
+---
+
 # Installation
 
 ## Requirements
@@ -5,7 +11,7 @@
 Before installing, ensure your environment meets these requirements:
 
 - PHP 8.2 or higher
-- Laravel 11.0 or 12.0
+- Laravel 11, 12 or 13
 - An OpenAI API key
 
 ## Install via Composer

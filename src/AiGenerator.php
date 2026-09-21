@@ -3,8 +3,8 @@
 namespace Darvis\LaravelAiGenerator;
 
 use Darvis\LaravelAiGenerator\Contracts\AiContentDriver;
-use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\Config;
+use Darvis\LaravelAiGenerator\Drivers\OpenAiDriver;
+use Darvis\LaravelAiGenerator\Support\AiGeneratorConfig;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
@@ -24,9 +24,9 @@ use Illuminate\Support\Str;
  * ));
  * ```
  *
- * @see \Darvis\LaravelAiGenerator\ContentRequest
- * @see \Darvis\LaravelAiGenerator\ContentResult
- * @see \Darvis\LaravelAiGenerator\Contracts\AiContentDriver
+ * @see ContentRequest
+ * @see ContentResult
+ * @see AiContentDriver
  */
 final class AiGenerator
 {
@@ -47,25 +47,23 @@ final class AiGenerator
      * the output for consistent formatting.
      *
      * @param  ContentRequest  $request  The content generation request with topic and options
-     * @return ContentResult  The generated content including title, intro, text, and SEO fields
+     * @return ContentResult The generated content including title, intro, text, and SEO fields
      *
-     * @throws \RuntimeException  If the AI driver encounters an error
+     * @throws \RuntimeException If the AI driver encounters an error
      */
     public function generate(ContentRequest $request): ContentResult
     {
-        $defaults = Config::get('ai-generator.defaults', []);
-
         // Normalize request with defaults
         $merged = new ContentRequest(
             topic: $request->topic,
-            language: $request->language ?? Config::get('ai-generator.default_language', 'nl'),
+            language: $request->language ?? AiGeneratorConfig::defaultLanguage(),
             audience: $request->audience,
-            tone: $request->tone ?? Arr::get($defaults, 'tone', 'informal'),
-            readingLevel: $request->readingLevel ?? Arr::get($defaults, 'reading_level', 'general'),
+            tone: $request->tone ?? AiGeneratorConfig::defaultTone(),
+            readingLevel: $request->readingLevel ?? AiGeneratorConfig::defaultReadingLevel(),
             keywords: $request->keywords,
             cta: $request->cta,
             brand: $request->brand,
-            maxWords: $request->maxWords ?? (int) Arr::get($defaults, 'max_words', 900),
+            maxWords: $request->maxWords ?? AiGeneratorConfig::defaultMaxWords(),
             includeImage: $request->includeImage,
             imageStyle: $request->imageStyle ?? 'photo',
             imageAspect: $request->imageAspect ?? '16:9',
@@ -82,7 +80,7 @@ final class AiGenerator
      * Trims whitespace from all text fields to ensure clean output.
      *
      * @param  ContentResult  $result  The raw result from the AI driver
-     * @return ContentResult  A new result instance with sanitized content
+     * @return ContentResult A new result instance with sanitized content
      */
     private function sanitize(ContentResult $result): ContentResult
     {
@@ -115,52 +113,24 @@ final class AiGenerator
      * @param  string  $prompt  The image generation prompt (in English preferred)
      * @param  string  $style  Image style: photo, illustration, flat, 3d
      * @param  string  $aspect  Aspect ratio: 1:1, 4:5, 16:9
-     * @return array{url?: string, base64?: string, error?: string}
+     * @return array{url?: string|null, base64?: string|null, error?: string}
      */
     public function generateImage(string $prompt, string $style = 'photo', string $aspect = '16:9'): array
     {
-        $cfg = Config::get('ai-generator.drivers.openai');
+        $apiKey = AiGeneratorConfig::openAiApiKey();
 
-        if (empty($cfg['api_key'])) {
+        if ($apiKey === null) {
             return ['error' => 'OPENAI_API_KEY is not set.'];
         }
 
-        $imageModel = strtolower((string) ($cfg['image_model'] ?? 'gpt-image-1'));
-
-        // Map aspect ratio to size
-        if (str_contains($imageModel, 'dall-e-3')) {
-            $size = match ($aspect) {
-                '1:1' => '1024x1024',
-                '4:5' => '1024x1792',
-                '16:9', '4:3' => '1792x1024',
-                default => '1792x1024',
-            };
-        } else {
-            $size = '1024x1024';
-        }
-
-        $baseUrl = rtrim((string) $cfg['base_url'], '/');
-        $url = $baseUrl.'/images/generations';
-
-        // Enhance prompt with style
-        $enhancedPrompt = $this->enhanceImagePrompt($prompt, $style);
-
-        $payload = [
-            'model' => (string) ($cfg['image_model'] ?? 'gpt-image-1'),
-            'prompt' => $enhancedPrompt,
-            'size' => $size,
-        ];
-
-        // Only DALL-E models support response_format parameter
-        if (str_contains($imageModel, 'dall-e')) {
-            $payload['response_format'] = 'b64_json';
-        }
+        $url = AiGeneratorConfig::openAiBaseUrl().'/images/generations';
+        $payload = OpenAiDriver::imagePayload($this->enhanceImagePrompt($prompt, $style), $aspect);
 
         try {
             $response = Http::timeout(120)
                 ->connectTimeout(30)
                 ->retry(1, 1000)
-                ->withToken((string) $cfg['api_key'])
+                ->withToken($apiKey)
                 ->acceptJson()
                 ->asJson()
                 ->post($url, $payload);

@@ -4,6 +4,7 @@ namespace Darvis\LaravelAiGenerator\Contracts;
 
 use Darvis\LaravelAiGenerator\ContentRequest;
 use Darvis\LaravelAiGenerator\ContentResult;
+use Darvis\LaravelAiGenerator\Drivers\OpenAiDriver;
 
 /**
  * Contract for AI content generation drivers.
@@ -23,7 +24,7 @@ use Darvis\LaravelAiGenerator\ContentResult;
  * }
  * ```
  *
- * @see \Darvis\LaravelAiGenerator\Drivers\OpenAiDriver
+ * @see OpenAiDriver
  */
 interface AiContentDriver
 {
@@ -34,9 +35,9 @@ interface AiContentDriver
      * and response parsing to produce a consistent ContentResult.
      *
      * @param  ContentRequest  $request  The content generation parameters
-     * @return ContentResult  The generated content with all fields populated
+     * @return ContentResult The generated content with all fields populated
      *
-     * @throws \RuntimeException  If the AI service is unavailable or returns an error
+     * @throws \RuntimeException If the AI service is unavailable or returns an error
      */
     public function generate(ContentRequest $request): ContentResult;
 }

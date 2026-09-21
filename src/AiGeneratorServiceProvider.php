@@ -4,6 +4,7 @@ namespace Darvis\LaravelAiGenerator;
 
 use Darvis\LaravelAiGenerator\Contracts\AiContentDriver;
 use Darvis\LaravelAiGenerator\Drivers\OpenAiDriver;
+use Darvis\LaravelAiGenerator\Support\AiGeneratorConfig;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -13,7 +14,7 @@ use Illuminate\Support\ServiceProvider;
  * configuration publishing, and driver bindings within the Laravel
  * service container.
  *
- * @see \Darvis\LaravelAiGenerator\AiGenerator
+ * @see AiGenerator
  */
 class AiGeneratorServiceProvider extends ServiceProvider
 {
@@ -35,7 +36,7 @@ class AiGeneratorServiceProvider extends ServiceProvider
      * Binds the AI content driver and generator as singletons in the container.
      * The driver is resolved based on the configured driver name.
      *
-     * @throws \RuntimeException  If an unsupported driver is configured
+     * @throws \RuntimeException If an unsupported driver is configured
      */
     public function register(): void
     {
@@ -45,10 +46,10 @@ class AiGeneratorServiceProvider extends ServiceProvider
         );
 
         $this->app->singleton(AiContentDriver::class, function ($app) {
-            $driver = config('ai-generator.driver', 'openai');
+            $driver = AiGeneratorConfig::driver();
 
             return match ($driver) {
-                'openai' => new OpenAiDriver(),
+                'openai' => new OpenAiDriver,
                 default => throw new \RuntimeException("Unsupported AI driver: {$driver}"),
             };
         });

@@ -3,23 +3,40 @@
     "description": "AI content generation service for Laravel applications with OpenAI support",
     "type": "library",
     "license": "MIT",
+    "homepage": "https://arviddejong.github.io/laravel-ai-generator/",
+    "keywords": [
+        "laravel",
+        "ai",
+        "openai",
+        "content-generation",
+        "seo",
+        "gpt",
+        "laravel-boost"
+    ],
     "authors": [
         {
             "name": "Arvid de Jong",
             "email": "info@arvid.nl"
         }
     ],
+    "support": {
+        "issues": "https://github.com/ArvidDeJong/laravel-ai-generator/issues",
+        "source": "https://github.com/ArvidDeJong/laravel-ai-generator",
+        "docs": "https://arviddejong.github.io/laravel-ai-generator/"
+    },
     "require": {
         "php": "^8.2",
-        "illuminate/support": "^11.0|^12.0",
-        "illuminate/http": "^11.0|^12.0"
+        "illuminate/http": "^11.0|^12.0|^13.0",
+        "illuminate/support": "^11.0|^12.0|^13.0"
     },
     "require-dev": {
+        "larastan/larastan": "^3.0",
         "laravel/pint": "^1.0",
         "mockery/mockery": "^1.6",
-        "orchestra/testbench": "^9.0|^10.0",
-        "pestphp/pest": "^3.0",
-        "pestphp/pest-plugin-laravel": "^3.0"
+        "orchestra/testbench": "^9.0|^10.0|^11.0",
+        "pestphp/pest": "^3.0|^4.0",
+        "pestphp/pest-plugin-laravel": "^3.0|^4.0",
+        "phpunit/phpunit": "^11.0|^12.0|^13.0"
     },
     "autoload": {
         "psr-4": {
@@ -32,10 +49,10 @@
         }
     },
     "scripts": {
-        "test": "vendor/bin/pest",
-        "test-coverage": "vendor/bin/pest --coverage",
-        "format": "vendor/bin/pint",
-        "format-test": "vendor/bin/pint --test"
+        "test": "pest tests",
+        "lint": "pint --test",
+        "format": "pint",
+        "analyse": "phpstan analyse --memory-limit=1G"
     },
     "config": {
         "sort-packages": true,
@@ -50,6 +67,6 @@
             ]
         }
     },
-    "minimum-stability": "dev",
+    "minimum-stability": "stable",
     "prefer-stable": true
 }

@@ -1,3 +1,9 @@
+---
+title: Custom drivers
+nav_order: 5
+description: "Plugging in another AI provider such as Anthropic or a local Ollama model by implementing AiContentDriver and binding it."
+---
+
 # Custom Drivers
 
 The package uses a driver-based architecture, making it easy to add support for other AI providers like Anthropic Claude, Google Gemini, or local models.
@@ -80,7 +86,9 @@ Add your driver configuration to `config/ai-generator.php`:
 
 ### Step 3: Register the Driver
 
-Extend the service provider to support your driver. Create a new service provider:
+Bind your driver in a service provider of your own. The package binds `AiContentDriver` for the
+drivers it knows and throws on any other name, so replace that binding instead of extending it:
+`extend()` would first build the package binding and never reach your code.
 
 ```php
 <?php
@@ -89,23 +97,22 @@ namespace App\Providers;
 
 use App\Services\AiDrivers\AnthropicDriver;
 use Darvis\LaravelAiGenerator\Contracts\AiContentDriver;
+use Darvis\LaravelAiGenerator\Support\AiGeneratorConfig;
 use Illuminate\Support\ServiceProvider;
 
 class AiGeneratorServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->extend(AiContentDriver::class, function ($driver, $app) {
-            $driverName = config('ai-generator.driver');
-
-            return match ($driverName) {
-                'anthropic' => new AnthropicDriver(),
-                default => $driver, // Fall back to package default
-            };
-        });
+        if (AiGeneratorConfig::driver() === 'anthropic') {
+            $this->app->singleton(AiContentDriver::class, fn () => new AnthropicDriver());
+        }
     }
 }
 ```
+
+Your provider runs after the package provider, so its binding wins. With any other driver name
+the package binding stays in place.
 
 Register it in `config/app.php` or `bootstrap/providers.php`:
 

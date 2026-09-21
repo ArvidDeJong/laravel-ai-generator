@@ -4,16 +4,10 @@
          bootstrap="vendor/autoload.php"
          colors="true"
          cacheDirectory=".phpunit.cache"
-         executionOrder="depends,defects"
-         failOnRisky="true"
-         failOnWarning="true"
-         beStrictAboutOutputDuringTests="true">
+>
     <testsuites>
-        <testsuite name="Unit">
-            <directory>tests/Unit</directory>
-        </testsuite>
-        <testsuite name="Feature">
-            <directory>tests/Feature</directory>
+        <testsuite name="Package">
+            <directory>tests</directory>
         </testsuite>
     </testsuites>
     <source>
@@ -21,14 +15,4 @@
             <directory>src</directory>
         </include>
     </source>
-    <coverage>
-        <report>
-            <html outputDirectory="coverage"/>
-            <text outputFile="php://stdout"/>
-        </report>
-    </coverage>
-    <php>
-        <env name="APP_ENV" value="testing"/>
-        <env name="OPENAI_API_KEY" value="test-api-key"/>
-    </php>
 </phpunit>

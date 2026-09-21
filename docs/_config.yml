@@ -1,0 +1,42 @@
+title: Laravel AI Generator
+description: "darvis/laravel-ai-generator writes structured content for a Laravel app with OpenAI: title, intro, HTML text, SEO title and meta description, and an optional image, from one request object."
+url: https://arviddejong.github.io
+baseurl: /laravel-ai-generator
+
+remote_theme: just-the-docs/just-the-docs@v0.12.0
+plugins:
+  - jekyll-remote-theme
+  - jekyll-relative-links
+  - jekyll-seo-tag
+  - jekyll-sitemap
+
+# Facts about the package, used by the structured data and llms.txt.
+package:
+  name: darvis/laravel-ai-generator
+  repository: https://github.com/ArvidDeJong/laravel-ai-generator
+  packagist: https://packagist.org/packages/darvis/laravel-ai-generator
+  license_url: https://github.com/ArvidDeJong/laravel-ai-generator/blob/main/LICENSE
+  requires: "PHP 8.2+, Laravel 11, 12 or 13, an OpenAI API key"
+  platforms: [Laravel]
+  keywords: [laravel, ai, openai, gpt, content generation, seo, blog posts, meta description, image generation, dall-e]
+
+# Developer credit in the footer and the structured data.
+developer:
+  company: ARVID.NL
+  url: https://arvid.nl
+
+color_scheme: light
+search_enabled: true
+heading_anchors: true
+
+aux_links:
+  GitHub: https://github.com/ArvidDeJong/laravel-ai-generator
+  Packagist: https://packagist.org/packages/darvis/laravel-ai-generator
+aux_links_new_tab: true
+
+gh_edit_link: true
+gh_edit_link_text: Edit this page on GitHub
+gh_edit_repository: https://github.com/ArvidDeJong/laravel-ai-generator
+gh_edit_branch: main
+gh_edit_source: docs
+gh_edit_view_mode: tree

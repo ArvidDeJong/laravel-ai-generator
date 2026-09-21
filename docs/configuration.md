@@ -1,8 +1,26 @@
+---
+title: Configuration
+nav_order: 3
+description: "Every option in config/ai-generator.php and every environment variable, with defaults, and the AiGeneratorConfig accessor that reads them."
+---
+
 # Configuration
 
 ## Configuration File
 
-After publishing, you'll find the configuration at `config/ai-generator.php`.
+After publishing, you'll find the configuration at `config/ai-generator.php`. Its keys are sorted
+alphabetically within every group.
+
+The package reads every setting through `Darvis\LaravelAiGenerator\Support\AiGeneratorConfig`, which
+holds each default once. Use it in your own code too, for example in a custom driver:
+
+```php
+use Darvis\LaravelAiGenerator\Support\AiGeneratorConfig;
+
+AiGeneratorConfig::defaultLanguage(); // 'nl'
+AiGeneratorConfig::openAiModel();     // 'gpt-4.1-mini'
+AiGeneratorConfig::openAiApiKey();    // null when the key is empty or unset
+```
 
 ## Available Options
 
@@ -26,9 +44,9 @@ ISO 639-1 language codes: `nl`, `en`, `de`, `fr`, `es`, etc.
 
 ```php
 'defaults' => [
-    'tone' => env('AI_GENERATOR_TONE', 'informal'),
-    'reading_level' => env('AI_GENERATOR_LEVEL', 'general'),
     'max_words' => env('AI_GENERATOR_MAX_WORDS', 900),
+    'reading_level' => env('AI_GENERATOR_LEVEL', 'general'),
+    'tone' => env('AI_GENERATOR_TONE', 'informal'),
 ],
 ```
 
@@ -49,8 +67,8 @@ ISO 639-1 language codes: `nl`, `en`, `de`, `fr`, `es`, etc.
     'openai' => [
         'api_key' => env('OPENAI_API_KEY'),
         'base_url' => env('OPENAI_BASE_URL', 'https://api.openai.com/v1'),
-        'model' => env('OPENAI_MODEL', 'gpt-4.1-mini'),
         'image_model' => env('OPENAI_IMAGE_MODEL', 'gpt-image-1'),
+        'model' => env('OPENAI_MODEL', 'gpt-4.1-mini'),
         'temperature' => env('OPENAI_TEMPERATURE', 0.7),
         'timeout' => env('OPENAI_TIMEOUT', 45),
     ],

@@ -1,19 +1,17 @@
 <?php
 
-return [
-    /*
-    |--------------------------------------------------------------------------
-    | Default AI Driver
-    |--------------------------------------------------------------------------
-    |
-    | This option controls the default AI driver that will be used to generate
-    | content. You may set this to any of the drivers defined below.
-    |
-    | Supported: "openai"
-    |
-    */
+/*
+|--------------------------------------------------------------------------
+| AI Generator
+|--------------------------------------------------------------------------
+|
+| Keys are sorted alphabetically within every group, so a setting is found
+| by name instead of by history. The package reads them through
+| Darvis\LaravelAiGenerator\Support\AiGeneratorConfig.
+|
+*/
 
-    'driver' => env('AI_GENERATOR_DRIVER', 'openai'),
+return [
 
     /*
     |--------------------------------------------------------------------------
@@ -37,10 +35,24 @@ return [
     */
 
     'defaults' => [
-        'tone' => env('AI_GENERATOR_TONE', 'informal'),           // informal|neutral|formal
-        'reading_level' => env('AI_GENERATOR_LEVEL', 'general'),  // general|expert|simple
         'max_words' => env('AI_GENERATOR_MAX_WORDS', 900),
+        'reading_level' => env('AI_GENERATOR_LEVEL', 'general'),  // general|expert|simple
+        'tone' => env('AI_GENERATOR_TONE', 'informal'),           // informal|neutral|formal
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Default AI Driver
+    |--------------------------------------------------------------------------
+    |
+    | This option controls the default AI driver that will be used to generate
+    | content. You may set this to any of the drivers defined below.
+    |
+    | Supported: "openai"
+    |
+    */
+
+    'driver' => env('AI_GENERATOR_DRIVER', 'openai'),
 
     /*
     |--------------------------------------------------------------------------
@@ -56,10 +68,11 @@ return [
         'openai' => [
             'api_key' => env('OPENAI_API_KEY'),
             'base_url' => env('OPENAI_BASE_URL', 'https://api.openai.com/v1'),
-            'model' => env('OPENAI_MODEL', 'gpt-4.1-mini'),
             'image_model' => env('OPENAI_IMAGE_MODEL', 'gpt-image-1'),
+            'model' => env('OPENAI_MODEL', 'gpt-4.1-mini'),
             'temperature' => env('OPENAI_TEMPERATURE', 0.7),
             'timeout' => env('OPENAI_TIMEOUT', 45),
         ],
     ],
+
 ];
