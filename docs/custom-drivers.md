@@ -97,13 +97,14 @@ namespace App\Providers;
 
 use App\Services\AiDrivers\AnthropicDriver;
 use Darvis\LaravelAiGenerator\Contracts\AiContentDriver;
+use Darvis\LaravelAiGenerator\Support\AiGeneratorConfig;
 use Illuminate\Support\ServiceProvider;
 
 class AiGeneratorServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        if (config('ai-generator.driver') === 'anthropic') {
+        if (AiGeneratorConfig::driver() === 'anthropic') {
             $this->app->singleton(AiContentDriver::class, fn () => new AnthropicDriver());
         }
     }

@@ -4,6 +4,7 @@ use Darvis\LaravelAiGenerator\ContentRequest;
 use Darvis\LaravelAiGenerator\ContentResult;
 use Darvis\LaravelAiGenerator\Contracts\AiContentDriver;
 use Darvis\LaravelAiGenerator\Facades\AiGenerator;
+use Darvis\LaravelAiGenerator\Support\AiGeneratorConfig;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -17,7 +18,7 @@ test('a custom driver registered the way the docs describe is used', function ()
     {
         public function register(): void
         {
-            if (config('ai-generator.driver') === 'fake') {
+            if (AiGeneratorConfig::driver() === 'fake') {
                 $this->app->singleton(AiContentDriver::class, fn () => new class implements AiContentDriver
                 {
                     public function generate(ContentRequest $request): ContentResult

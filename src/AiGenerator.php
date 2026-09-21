@@ -113,7 +113,7 @@ final class AiGenerator
      * @param  string  $prompt  The image generation prompt (in English preferred)
      * @param  string  $style  Image style: photo, illustration, flat, 3d
      * @param  string  $aspect  Aspect ratio: 1:1, 4:5, 16:9
-     * @return array{url?: string, base64?: string, error?: string}
+     * @return array{url?: string|null, base64?: string|null, error?: string}
      */
     public function generateImage(string $prompt, string $style = 'photo', string $aspect = '16:9'): array
     {
