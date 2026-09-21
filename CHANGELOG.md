@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- A Laravel Boost skill, `laravel-ai-generator-development`, next to the guideline: how a generation
+  runs and what each failure gives you, saving the image, queueing, custom drivers and testing
+  without calling OpenAI.
+- A social preview image for the documentation site.
+
 ## [1.1.0] - 2026-09-21
 
 ### Added
