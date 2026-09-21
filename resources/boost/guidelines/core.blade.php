@@ -9,7 +9,7 @@ Generates structured content with OpenAI: a title, a plain text intro, the main 
 - `text` is HTML written by a model. Sanitise it before rendering it unescaped.
 - Settings live under the config key `ai-generator` (file `config/ai-generator.php`). Read them through `Darvis\LaravelAiGenerator\Support\AiGeneratorConfig` (`defaultLanguage()`, `openAiModel()`, `openAiApiKey()`), not with `config()`.
 - Another provider: implement `Darvis\LaravelAiGenerator\Contracts\AiContentDriver` and replace the binding in your own service provider with `$this->app->singleton(AiContentDriver::class, ...)`. Don't use `extend()`: the package binding throws on a driver name it does not know before your extender runs.
-- Generating is slow, tens of seconds with an image. Do it in a queued job, not in a web request.
+- Every request inside `generate()` waits up to `OPENAI_TIMEOUT` seconds (45 by default) and is tried twice. Generate in a queued job, not in a web request.
 - In tests, never call OpenAI: use `Http::fake()` or bind a fake `AiContentDriver`.
 
 @verbatim

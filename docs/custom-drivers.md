@@ -1,214 +1,212 @@
 ---
-title: Custom drivers
+title: "Custom drivers"
 nav_order: 5
-description: "Plugging in another AI provider such as Anthropic or a local Ollama model by implementing AiContentDriver and binding it."
+description: "Let another AI provider write the text: implement the AiContentDriver contract, keep its settings in config/services.php and replace the container binding."
 ---
 
-# Custom Drivers
+# Custom drivers
 
-The package uses a driver-based architecture, making it easy to add support for other AI providers like Anthropic Claude, Google Gemini, or local models.
+A driver is the class that talks to the AI provider. The package ships one, for OpenAI. To let
+another provider write the text, you write a class with one method and tell Laravel to use it.
 
-## Creating a Custom Driver
+## What a driver has to do
 
-### Step 1: Implement the Interface
+Your class implements `Darvis\LaravelAiGenerator\Contracts\AiContentDriver`:
 
-Create a new class that implements `AiContentDriver`:
+```php
+public function generate(ContentRequest $request): ContentResult;
+```
+
+- The request arrives with the defaults filled in: `language`, `tone`, `readingLevel` and `maxWords`
+  are never `null`, `imageStyle` and `imageAspect` neither.
+- Return a `ContentResult` with `title`, `intro`, `text`, `seoTitle` and `seoDescription`. The
+  package trims them afterwards.
+- Throw a `RuntimeException` when the text fails, so calling code can handle your driver the same
+  way as the OpenAI driver.
+- The image is your driver's job too. The package does not make an image for a custom driver, so
+  `includeImage` does nothing unless your driver acts on it. When an image fails, return the text
+  with `errorMessage` filled instead of throwing.
+
+## Step 1: write the driver
+
+The provider below, "Acme AI", does not exist. Its URL, its payload and the shape of its answer are
+made up. Replace them with what the documentation of your provider says.
+
+**`app/Services/AiDrivers/AcmeAiDriver.php`**
 
 ```php
 <?php
 
 namespace App\Services\AiDrivers;
 
-use Darvis\LaravelAiGenerator\Contracts\AiContentDriver;
 use Darvis\LaravelAiGenerator\ContentRequest;
 use Darvis\LaravelAiGenerator\ContentResult;
+use Darvis\LaravelAiGenerator\Contracts\AiContentDriver;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
+use RuntimeException;
 
-class AnthropicDriver implements AiContentDriver
+class AcmeAiDriver implements AiContentDriver
 {
     public function generate(ContentRequest $request): ContentResult
     {
-        $response = Http::withHeaders([
-            'x-api-key' => config('ai-generator.drivers.anthropic.api_key'),
-            'anthropic-version' => '2023-06-01',
-        ])->post('https://api.anthropic.com/v1/messages', [
-            'model' => config('ai-generator.drivers.anthropic.model', 'claude-3-sonnet'),
-            'max_tokens' => 4096,
-            'messages' => [
-                ['role' => 'user', 'content' => $this->buildPrompt($request)],
-            ],
-        ]);
+        $key = config('services.acme_ai.key');
 
-        $data = $response->json();
-        $content = $this->parseResponse($data);
+        if (! is_string($key) || $key === '') {
+            throw new RuntimeException('ACME_AI_KEY is not set.');
+        }
+
+        try {
+            // URL, payload and response shape are made up: use the ones from your provider's documentation.
+            $response = Http::timeout(60)
+                ->withToken($key)
+                ->acceptJson()
+                ->post(config('services.acme_ai.url').'/generate', [
+                    'model' => config('services.acme_ai.model'),
+                    'prompt' => $this->prompt($request),
+                ])
+                ->throw();
+        } catch (ConnectionException|RequestException $e) {
+            throw new RuntimeException('Acme AI request failed: '.$e->getMessage(), 0, $e);
+        }
+
+        $fields = json_decode((string) $response->json('output'), true);
+
+        if (! is_array($fields)) {
+            throw new RuntimeException('Acme AI did not return JSON.');
+        }
 
         return new ContentResult(
-            title: $content['title'],
-            intro: $content['intro'],
-            text: $content['text'],
-            seoTitle: $content['seo_title'],
-            seoDescription: $content['seo_description'],
-            imagePrompt: $content['image_prompt'] ?? null,
+            title: (string) ($fields['title'] ?? ''),
+            intro: (string) ($fields['intro'] ?? ''),
+            text: (string) ($fields['text'] ?? ''),
+            seoTitle: (string) ($fields['seo_title'] ?? ''),
+            seoDescription: (string) ($fields['seo_description'] ?? ''),
         );
     }
 
-    private function buildPrompt(ContentRequest $request): string
+    private function prompt(ContentRequest $request): string
     {
-        // Build your prompt here
-        return "Generate content about: {$request->topic}...";
-    }
+        $keywords = implode(', ', $request->keywords ?? []);
 
-    private function parseResponse(array $data): array
-    {
-        // Parse the API response
-        $text = $data['content'][0]['text'] ?? '';
-        return json_decode($text, true);
+        return <<<PROMPT
+        Write an article about "{$request->topic}".
+        Language: {$request->language}. Tone: {$request->tone}. Reading level: {$request->readingLevel}.
+        At most {$request->maxWords} words. Keywords: {$keywords}.
+        Return only a JSON object with the keys title, intro, text (HTML with h2, p, ul and li),
+        seo_title (at most 60 characters) and seo_description (at most 155 characters).
+        PROMPT;
     }
 }
 ```
 
-### Step 2: Add Configuration
+The driver sends one request, reads the JSON the model wrote and maps it to a `ContentResult`. Every
+failure becomes a `RuntimeException`.
 
-Add your driver configuration to `config/ai-generator.php`:
+## Step 2: keep the driver's settings in your own config
+
+The settings of your driver belong to your application, not to `config/ai-generator.php`. Laravel's
+`config/services.php` is the usual place for the credentials of an external service.
+
+**`config/services.php`**
 
 ```php
-'drivers' => [
-    'openai' => [
-        // existing config...
-    ],
-
-    'anthropic' => [
-        'api_key' => env('ANTHROPIC_API_KEY'),
-        'model' => env('ANTHROPIC_MODEL', 'claude-3-sonnet-20240229'),
-    ],
+'acme_ai' => [
+    'key' => env('ACME_AI_KEY'),
+    'model' => env('ACME_AI_MODEL'),
+    'url' => env('ACME_AI_URL'),
 ],
 ```
 
-### Step 3: Register the Driver
+**`.env`**
 
-Bind your driver in a service provider of your own. The package binds `AiContentDriver` for the
-drivers it knows and throws on any other name, so replace that binding instead of extending it:
-`extend()` would first build the package binding and never reach your code.
+```env
+AI_GENERATOR_DRIVER=acme
+ACME_AI_KEY=your-api-key-here
+ACME_AI_MODEL=the-model-name-from-your-provider
+ACME_AI_URL=https://api.your-provider.example/v1
+```
+
+## Step 3: replace the binding
+
+A binding tells Laravel's service container which class to build when code asks for an interface.
+The package binds `AiContentDriver` to its OpenAI driver. Bind your own class in a service provider
+of your application, and the package uses yours.
+
+**`app/Providers/AiDriverServiceProvider.php`**
 
 ```php
 <?php
 
 namespace App\Providers;
 
-use App\Services\AiDrivers\AnthropicDriver;
+use App\Services\AiDrivers\AcmeAiDriver;
 use Darvis\LaravelAiGenerator\Contracts\AiContentDriver;
 use Darvis\LaravelAiGenerator\Support\AiGeneratorConfig;
 use Illuminate\Support\ServiceProvider;
 
-class AiGeneratorServiceProvider extends ServiceProvider
+class AiDriverServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        if (AiGeneratorConfig::driver() === 'anthropic') {
-            $this->app->singleton(AiContentDriver::class, fn () => new AnthropicDriver());
+        if (AiGeneratorConfig::driver() === 'acme') {
+            $this->app->singleton(AiContentDriver::class, fn () => new AcmeAiDriver);
         }
     }
 }
 ```
 
-Your provider runs after the package provider, so its binding wins. With any other driver name
-the package binding stays in place.
-
-Register it in `config/app.php` or `bootstrap/providers.php`:
+Add the provider to **`bootstrap/providers.php`** when it is not listed there yet. An application
+that was upgraded from an older Laravel may list its providers in `config/app.php` instead.
 
 ```php
-// bootstrap/providers.php (Laravel 11+)
 return [
-    // ...
-    App\Providers\AiGeneratorServiceProvider::class,
+    App\Providers\AppServiceProvider::class,
+    App\Providers\AiDriverServiceProvider::class,
 ];
 ```
 
-### Step 4: Use Your Driver
+Providers of your application register after the providers of packages, so your binding replaces
+the one of the package. With `AI_GENERATOR_DRIVER=openai` the `if` is false and the OpenAI driver
+stays in place, which lets you switch back in `.env`.
 
-Set the driver in your `.env`:
+### Don't use extend()
 
-```env
-AI_GENERATOR_DRIVER=anthropic
-ANTHROPIC_API_KEY=sk-ant-your-key-here
+`$this->app->extend(AiContentDriver::class, ...)` does not work here. `extend()` first builds the
+binding of the package, and that one throws `Unsupported AI driver: acme` on a name it does not know,
+before your code runs. Replace the binding, as above.
+
+## Step 4: check that your driver is used
+
+This does not call any API:
+
+```bash
+php artisan tinker --execute="echo get_class(app(\Darvis\LaravelAiGenerator\Contracts\AiContentDriver::class)), PHP_EOL;"
 ```
 
-## Example: Local LLM Driver
+You should see `App\Services\AiDrivers\AcmeAiDriver`. When you see `Unsupported AI driver: acme`
+instead, your provider is not registered or the name in the `if` differs from
+`AI_GENERATOR_DRIVER`.
 
-Here's an example for a local Ollama instance:
+## generateImage() still calls OpenAI
+
+`AiGenerator::generateImage()` does not go through the driver. It always calls the OpenAI image API
+with `OPENAI_API_KEY` and `OPENAI_IMAGE_MODEL`, whatever driver writes the text. Without an OpenAI
+key it returns `['error' => 'OPENAI_API_KEY is not set.']`.
+
+To add an image to a text from your own driver, you can call it yourself after `generate()`:
 
 ```php
-<?php
-
-namespace App\Services\AiDrivers;
-
-use Darvis\LaravelAiGenerator\Contracts\AiContentDriver;
+use Darvis\LaravelAiGenerator\AiGenerator;
 use Darvis\LaravelAiGenerator\ContentRequest;
-use Darvis\LaravelAiGenerator\ContentResult;
-use Illuminate\Support\Facades\Http;
 
-class OllamaDriver implements AiContentDriver
-{
-    public function generate(ContentRequest $request): ContentResult
-    {
-        $response = Http::timeout(120)
-            ->post(config('ai-generator.drivers.ollama.base_url') . '/api/generate', [
-                'model' => config('ai-generator.drivers.ollama.model', 'llama2'),
-                'prompt' => $this->buildPrompt($request),
-                'format' => 'json',
-                'stream' => false,
-            ]);
+$generator = app(AiGenerator::class);
 
-        $content = json_decode($response->json('response'), true);
-
-        return new ContentResult(
-            title: $content['title'] ?? '',
-            intro: $content['intro'] ?? '',
-            text: $content['text'] ?? '',
-            seoTitle: $content['seo_title'] ?? '',
-            seoDescription: $content['seo_description'] ?? '',
-        );
-    }
-
-    private function buildPrompt(ContentRequest $request): string
-    {
-        return <<<PROMPT
-Generate a JSON object with the following structure for the topic "{$request->topic}":
-{
-    "title": "article title",
-    "intro": "2-4 sentence introduction",
-    "text": "main content with HTML formatting",
-    "seo_title": "SEO title max 60 chars",
-    "seo_description": "meta description max 155 chars"
-}
-PROMPT;
-    }
-}
+$result = $generator->generate(new ContentRequest(topic: 'Your topic'));
+$image = $generator->generateImage('A short description of the image, in English');
 ```
 
-Configuration:
+## Test your driver
 
-```php
-// config/ai-generator.php
-'drivers' => [
-    // ...
-    'ollama' => [
-        'base_url' => env('OLLAMA_BASE_URL', 'http://localhost:11434'),
-        'model' => env('OLLAMA_MODEL', 'llama2'),
-    ],
-],
-```
-
-## Driver Best Practices
-
-1. **Handle errors gracefully** - Catch API exceptions and throw `RuntimeException` with clear messages
-
-2. **Respect timeouts** - Configure appropriate timeouts for your AI provider
-
-3. **Implement retries** - Add retry logic for transient failures
-
-4. **Validate responses** - Ensure the AI response matches the expected structure
-
-5. **Support all request parameters** - Map `ContentRequest` fields to your provider's capabilities
-
-6. **Return consistent results** - Always return a valid `ContentResult` object
+Fake the HTTP call, so the test never reaches your provider. [Testing](testing.md) shows how.

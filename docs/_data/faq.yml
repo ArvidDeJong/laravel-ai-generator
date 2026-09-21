@@ -1,25 +1,38 @@
 # Questions as people ask them to an assistant. Short, factual answers.
 # Rendered on faq.md, in the FAQPage structured data and in llms.txt.
+- q: What is darvis/laravel-ai-generator?
+  a: >-
+    A Laravel package that writes structured content with OpenAI. You pass a `ContentRequest` with a
+    topic and get a `ContentResult` with a title, a plain text intro, the main text as HTML, an SEO
+    title, a meta description and optionally an image. It has no screens, routes or database tables;
+    you call it from your own code and store the result yourself.
+
 - q: How do I generate a blog post with OpenAI in a Laravel application?
   a: >-
-    Install `darvis/laravel-ai-generator`, set `OPENAI_API_KEY` and call
-    `AiGenerator::generate(new ContentRequest(topic: 'Your topic'))`. You get a `ContentResult` with a
-    title, a short plain text intro, the main text as HTML with h2, p and list tags, an SEO title of at
-    most 60 characters and a meta description of at most 155 characters.
+    Run `composer require darvis/laravel-ai-generator`, set `OPENAI_API_KEY` in `.env` and call
+    `AiGenerator::generate(new ContentRequest(topic: 'Your topic', includeImage: false))` on the facade
+    `Darvis\LaravelAiGenerator\Facades\AiGenerator`. The result has `title`, `intro`, `text` as HTML
+    with h2, p and list tags, `seoTitle` and `seoDescription`.
 
-- q: Which languages can darvis/laravel-ai-generator write in?
+- q: What do I need to use darvis/laravel-ai-generator, and what does it cost?
   a: >-
-    Any language the model knows. Pass an ISO 639-1 code such as `en`, `de` or `fr` as `language`, or
-    set `AI_GENERATOR_LANGUAGE` for the default, which is `nl`. For Dutch, German and French the prompt
-    also tells the model which form of address fits the tone, for example je/jij or Sie.
+    PHP 8.2 or higher, Laravel 11, 12 or 13, and an OpenAI API key. The package is free and MIT
+    licensed. OpenAI bills every call to your own OpenAI account.
 
 - q: Does every request also generate an image?
   a: >-
-    Yes, unless you say otherwise. `includeImage` is true by default, which means a second call to the
-    OpenAI image API after the text, with its own cost and waiting time. Pass
-    `includeImage: false` when you only want text. For an image without text, use `generateImage()`.
+    Yes, unless you say otherwise. `includeImage` is true by default, which means a second, billed call
+    to the OpenAI image API after the text. Pass `includeImage: false` when you only want text. For
+    an image without text, use `generateImage()`.
 
-- q: Can I use Claude, Gemini or a local model instead of OpenAI?
+- q: Which languages can darvis/laravel-ai-generator write in?
+  a: >-
+    The language is an instruction in the prompt, so it depends on the model. Pass an ISO 639-1 code such
+    as `en`, `de` or `fr` as `language`, or set `AI_GENERATOR_LANGUAGE` for the default, which is `nl`.
+    For Dutch, German and French the prompt also names the form of address that fits the tone, for
+    example je/jij or Sie.
+
+- q: Can I use another AI provider or a local model instead of OpenAI?
   a: >-
     Yes, for the text. Write a class that implements `AiContentDriver` and bind it in a service provider
     of your own; the custom drivers page shows the exact code. `generateImage()` always calls the OpenAI
@@ -27,23 +40,25 @@
 
 - q: Is it safe to output the generated HTML directly in a Blade view?
   a: >-
-    Treat it as untrusted input. The `text` field is HTML written by a language model, and a model can
-    be talked into producing any markup, including script tags. Run it through an HTML sanitiser with
-    an allow list before you render it unescaped.
+    Treat it as untrusted input. The `text` field is HTML written by a language model, and the package
+    does not sanitise it. Run it through an HTML sanitiser with an allow list before you render it
+    unescaped.
 
 - q: What happens when the OpenAI API fails?
   a: >-
-    A failing text call is tried once more and then throws a `RuntimeException`. A failing image call does not
-    throw, because the image is a bonus. You then get the text with `errorMessage` filled in and
-    `hasError()` returning true, so check that before you save the result as complete.
+    A failing text call is tried twice and then throws a `RuntimeException`, for example
+    `OpenAI request failed: ...`. A failing image call does not throw. You then get the text with
+    `errorMessage` filled in and `hasError()` returning true, so check that before you save the result
+    as complete.
 
-- q: How do I generate many articles without timeouts?
+- q: How do I generate many articles in Laravel without timeouts?
   a: >-
-    Put each `generate()` call in a queued job. A text call waits up to `OPENAI_TIMEOUT` seconds, 45 by
-    default, and an image adds more, which is too long for a web request when you generate in bulk.
-    The usage page has a job example.
+    Put each `generate()` call in a queued job. Every request inside `generate()` waits up to
+    `OPENAI_TIMEOUT` seconds, 45 by default, and is tried twice, and an image adds a second request.
+    Give the job a `$timeout` above that; the usage page has a job example.
 
-- q: Which PHP and Laravel versions does darvis/laravel-ai-generator support?
+- q: How do I test code that uses darvis/laravel-ai-generator without calling OpenAI?
   a: >-
-    PHP 8.2 or higher and Laravel 11, 12 and 13. Every combination runs in CI, including the lowest
-    versions the constraints allow.
+    Bind a fake `AiContentDriver` in the test that returns a fixed `ContentResult`, or use `Http::fake()`
+    with an answer in the shape of the OpenAI Responses API. Add `Http::preventStrayRequests()` so a
+    forgotten fake fails the test. The testing page has complete examples.
