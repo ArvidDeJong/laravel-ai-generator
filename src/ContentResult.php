@@ -34,6 +34,8 @@ final class ContentResult
      * @param  string|null  $imageUrl  URL to the generated image (if available)
      * @param  string|null  $imageBase64  Base64-encoded image data (if available)
      * @param  string|null  $errorMessage  Error message if generation partially failed
+     * @param  string|null  $driver  The driver that wrote the text (openai, anthropic, gemini, xai); null for a custom driver
+     * @param  string|null  $model  The text model that wrote the text; null for a custom driver
      */
     public function __construct(
         public readonly string $title,
@@ -45,6 +47,8 @@ final class ContentResult
         public readonly ?string $imageUrl = null,
         public readonly ?string $imageBase64 = null,
         public readonly ?string $errorMessage = null,
+        public readonly ?string $driver = null,
+        public readonly ?string $model = null,
     ) {}
 
     /**

@@ -1,12 +1,13 @@
 ---
 title: "Testing"
-nav_order: 6
-description: "Test Laravel code that uses darvis/laravel-ai-generator without calling OpenAI: bind a fake driver, or fake the HTTP calls in the shape of the Responses API."
+nav_order: 9
+description: "Test Laravel code that uses darvis/laravel-ai-generator without calling a real AI API: bind a fake driver, or fake the HTTP calls of OpenAI, Claude, Gemini or Grok."
 ---
 
 # Testing
 
-A test must never call OpenAI: it costs money, it is slow and the answer differs on every run.
+A test must never call a real AI provider: it costs money, it is slow and the answer differs on
+every run.
 There are two ways to avoid it. Pick the first one unless you have a reason for the second.
 
 The examples use [Pest](https://pestphp.com). In a PHPUnit test class the same lines go inside a test
@@ -50,7 +51,7 @@ test('the command prints the generated article', function () {
 });
 ```
 
-The anonymous class takes the place of the OpenAI driver, so `generate()` returns the fixed result
+The anonymous class takes the place of the configured driver, so `generate()` returns the fixed result
 and no request leaves the machine. The test needs no API key.
 
 Bind the fake **before** anything resolves `AiGenerator`. The generator is a singleton that receives
@@ -146,6 +147,60 @@ The result then has the text, `hasError()` is `true` and `errorMessage` starts w
 such a test takes a little longer.
 
 `generateImage()` only needs the `*/images/generations` fake, and also an API key.
+
+## Fake Claude, Gemini or Grok
+
+The other drivers work the same way: set their key, fake their URL and answer in the shape of their
+API. The JSON string with the six fields goes where each provider puts its text.
+
+```php
+use Darvis\LaravelAiGenerator\ContentRequest;
+use Darvis\LaravelAiGenerator\Facades\AiGenerator;
+use Illuminate\Support\Facades\Http;
+
+$fields = json_encode([
+    'title' => 'A fake title',
+    'intro' => 'A fake intro.',
+    'text' => '<p>Fake text</p>',
+    'seo_title' => 'Fake SEO title',
+    'seo_description' => 'Fake meta description',
+    'image_prompt' => 'A box on a table',
+]);
+
+config()->set('ai-generator.drivers.anthropic.api_key', 'test-key');
+config()->set('ai-generator.drivers.gemini.api_key', 'test-key');
+config()->set('ai-generator.drivers.xai.api_key', 'test-key');
+
+Http::preventStrayRequests();
+
+Http::fake([
+    // Claude: the Messages API, the text is in a content block of type "text"
+    'api.anthropic.com/v1/messages' => Http::response([
+        'content' => [['type' => 'text', 'text' => $fields]],
+        'stop_reason' => 'end_turn',
+    ]),
+
+    // Gemini: generateContent, the text is in candidates[0].content.parts
+    'generativelanguage.googleapis.com/*' => Http::response([
+        'candidates' => [['content' => ['parts' => [['text' => $fields]]], 'finishReason' => 'STOP']],
+    ]),
+
+    // Grok: chat completions, the text is the message content
+    'api.x.ai/v1/chat/completions' => Http::response([
+        'choices' => [['message' => ['content' => $fields]]],
+    ]),
+]);
+
+$result = AiGenerator::using('anthropic')->generate(new ContentRequest(topic: 'Packaging', includeImage: false));
+```
+
+For images:
+
+- **Gemini** answers its image model on the same `generateContent` URL, with the image in a part
+  `['inlineData' => ['mimeType' => 'image/png', 'data' => '<base64>']]`.
+- **Grok** answers `api.x.ai/v1/images/generations` with `['data' => [['b64_json' => '<base64>']]]`.
+- **Claude** makes no images: with `anthropic` as text driver the image request goes to OpenAI, so
+  fake `*/images/generations` of OpenAI and set `OPENAI_API_KEY` in the test.
 
 ## Test a custom driver
 

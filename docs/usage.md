@@ -1,6 +1,6 @@
 ---
 title: "Usage"
-nav_order: 3
+nav_order: 4
 description: "A complete example that generates an article in Laravel, every ContentRequest option, the ContentResult, saving the image, error handling and queued jobs."
 ---
 
@@ -61,8 +61,8 @@ Run it:
 php artisan article:generate "How to start a vegetable garden"
 ```
 
-Laravel injects the `AiGenerator` into `handle()`. The package sends one text request to OpenAI and
-the command prints the title, the intro, the HTML text and the two SEO fields. When the call fails,
+Laravel injects the `AiGenerator` into `handle()`. The package sends one text request to the default
+provider (`AI_GENERATOR_DRIVER`, OpenAI unless you changed it) and the command prints the title, the intro, the HTML text and the two SEO fields. When the call fails,
 the command prints the message of the exception; [Troubleshooting](troubleshooting.md) lists every
 message.
 
@@ -71,12 +71,14 @@ before you remove it.
 
 ## The image is on by default and costs a second call {#image-default}
 
-`includeImage` defaults to `true`. With the OpenAI driver that means:
+`includeImage` defaults to `true`. That means:
 
 1. The model also writes an English image prompt, which you get back as `imagePrompt`.
-2. The package sends a second request, to the OpenAI image API, with that prompt.
+2. The package sends a second request, to the image driver, with that prompt. That is the text driver
+   when it can make images (OpenAI, Gemini, Grok), OpenAI when it cannot (Claude), or the driver in
+   `AI_GENERATOR_IMAGE_DRIVER`. See [Multiple providers](providers.md#which-provider-makes-the-images).
 
-OpenAI bills that second request too, and you wait for it. Pass `includeImage: false` for every text
+The provider bills that second request too, and you wait for it. Pass `includeImage: false` for every text
 that does not need an image.
 
 ## Get the generator in your own code
@@ -114,6 +116,23 @@ $result = AiGenerator::generate(new ContentRequest(topic: 'Your topic'));
 
 The facade has no global alias, so import `Darvis\LaravelAiGenerator\Facades\AiGenerator`. The
 service class and the facade are both called `AiGenerator`: import one of them per file.
+
+## Another provider for one call
+
+`using()` returns a generator that writes with another driver, and optionally another model:
+
+```php
+use Darvis\LaravelAiGenerator\ContentRequest;
+use Darvis\LaravelAiGenerator\Facades\AiGenerator;
+
+$request = new ContentRequest(topic: 'Your topic', includeImage: false);
+
+$result = AiGenerator::using('anthropic')->generate($request);
+$result = AiGenerator::using('openai', 'gpt-6-luna')->generate($request);
+```
+
+The driver names are `openai`, `anthropic`, `gemini` and `xai`, or `chatgpt`, `claude`, `google` and
+`grok`. [Multiple providers](providers.md) explains images and fallbacks.
 
 ## Every request option
 
@@ -176,6 +195,8 @@ $request = new ContentRequest(
 | `imageUrl` | `?string` | URL of the image, when the image API returned one. |
 | `imageBase64` | `?string` | The image as base64, when the image API returned that. |
 | `errorMessage` | `?string` | Filled when the text succeeded but the image failed. |
+| `driver` | `?string` | The driver that wrote the text, such as `anthropic`. `null` for a custom driver. |
+| `model` | `?string` | The model that wrote the text. `null` for a custom driver. |
 
 Two helpers: `hasImage()` is `true` when `imageUrl` or `imageBase64` is filled, `hasError()` is
 `true` when `errorMessage` is filled.
@@ -215,7 +236,10 @@ if ($result->hasImage()) {
 This writes the image to the `public` disk. The package does not report the file type; check what
 your image model returns before you rely on the `.png` extension.
 
-### The image size follows the aspect ratio only with DALL-E 3 {#image-size}
+### The image size and the aspect ratio {#image-size}
+
+Gemini gets the ratio you ask for. Grok too, except `4:5`, which it does not offer: the package asks
+for `3:4` instead. With OpenAI the size only follows the ratio with DALL-E 3:
 
 When `OPENAI_IMAGE_MODEL` contains `dall-e-3`, the package asks for `1024x1024` (`1:1`), `1024x1792`
 (`4:5`) or `1792x1024` (every other value, including `16:9`). For every other image model, including
@@ -238,6 +262,7 @@ try {
     $result = app(AiGenerator::class)->generate(new ContentRequest(topic: 'Your topic'));
 } catch (RuntimeException $e) {
     // The text failed: no key, no connection, an HTTP error or an unreadable answer.
+    // With fallbacks configured, every fallback driver failed as well.
     Log::error('Generation failed: '.$e->getMessage());
 
     return;
@@ -250,10 +275,11 @@ if ($result->hasError()) {
 ```
 
 - **The text fails**: `generate()` throws a `RuntimeException`. The package tries the text request
-  twice, 250 milliseconds apart, before it throws.
+  twice, 250 milliseconds apart. When you set [fallbacks](providers.md#fallbacks-another-provider-takes-over),
+  the next driver is tried; when every driver fails, the message starts with `Every AI driver failed.`
 - **The image fails**: nothing is thrown. You get the full text, `hasImage()` is `false`,
-  `hasError()` is `true` and `errorMessage` starts with `OpenAI Image Error:`. The image request is
-  also tried twice.
+  `hasError()` is `true` and `errorMessage` names the image provider, for example
+  `OpenAI Image Error:`. The image request is also tried twice.
 
 Check `hasError()` before you mark a result as complete.
 
@@ -269,6 +295,7 @@ $image = app(AiGenerator::class)->generateImage(
     'A lighthouse at dusk',
     style: 'illustration',   // photo, illustration, flat or 3d
     aspect: '16:9',          // 1:1, 4:5 or 16:9
+    driver: 'gemini',        // optional: openai, gemini or xai
 );
 
 if (isset($image['error'])) {
@@ -283,19 +310,21 @@ What you need to know:
 
 - It returns an array and does not throw. On success the array has the keys `url` and `base64`, one
   of them filled. On failure it has only the key `error`.
-- It always calls the OpenAI image API with `OPENAI_IMAGE_MODEL` and `OPENAI_API_KEY`, also when a
-  [custom driver](custom-drivers.md) writes your text.
+- Without `driver` it uses the image driver: `AI_GENERATOR_IMAGE_DRIVER`, or else the text driver
+  when it can make images, or else OpenAI. With the `openai` or `anthropic` driver, or a
+  [custom driver](custom-drivers.md), that is OpenAI with `OPENAI_IMAGE_MODEL` and `OPENAI_API_KEY`.
+- A driver without images, such as `claude`, returns an `error` that says so.
 - The style becomes a prefix of your prompt, for example `Digital illustration of`, and
   `No text or watermarks.` is added at the end. Any other style value sends your prompt unchanged.
-- It waits up to 120 seconds and tries once. It does not use `OPENAI_TIMEOUT`.
+- It waits up to 120 seconds and tries once. It does not use the timeout of the provider.
 
 ## Generate in a queued job {#queued-job}
 
 A queued job is a task that a background worker runs, so the visitor does not wait for it; see
 [Queues](https://laravel.com/docs/queues) in the Laravel documentation.
 
-Every request inside `generate()` waits up to `OPENAI_TIMEOUT` seconds, 45 by default, and is tried
-twice. With an image that is four waits of 45 seconds in the worst case, which is longer than a web
+Every request inside `generate()` waits up to the timeout of its provider (`OPENAI_TIMEOUT`,
+`ANTHROPIC_TIMEOUT` and so on), 45 seconds by default, and is tried twice. With an image that is four waits of 45 seconds in the worst case, which is longer than a web
 request should take.
 
 This example assumes a `Post` model with the columns used below.

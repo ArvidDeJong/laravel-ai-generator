@@ -3,10 +3,11 @@
 namespace Darvis\LaravelAiGenerator;
 
 use Darvis\LaravelAiGenerator\Contracts\AiContentDriver;
-use Darvis\LaravelAiGenerator\Drivers\OpenAiDriver;
 use Darvis\LaravelAiGenerator\Support\AiGeneratorConfig;
-use Illuminate\Support\Facades\Http;
+use Darvis\LaravelAiGenerator\Support\ContentPrompt;
+use Darvis\LaravelAiGenerator\Support\Provider;
 use Illuminate\Support\Str;
+use RuntimeException;
 
 /**
  * Main AI content generator service.
@@ -22,6 +23,9 @@ use Illuminate\Support\Str;
  *     topic: 'Benefits of Laravel',
  *     language: 'en',
  * ));
+ *
+ * // Another provider for one call, optionally with another model
+ * $result = $generator->using('anthropic')->generate($request);
  * ```
  *
  * @see ContentRequest
@@ -34,22 +38,49 @@ final class AiGenerator
      * Create a new AiGenerator instance.
      *
      * @param  AiContentDriver  $driver  The AI driver implementation to use for content generation
+     * @param  AiGeneratorManager|null  $manager  Builds the other drivers for using(), fallbacks and images; the container's when null
+     * @param  bool  $useFallbacks  Whether a failed text call moves on to the drivers in the fallback config
      */
     public function __construct(
         private readonly AiContentDriver $driver,
+        private readonly ?AiGeneratorManager $manager = null,
+        private readonly bool $useFallbacks = true,
     ) {}
+
+    /**
+     * A generator that writes with another driver, optionally with another text model.
+     *
+     * The fallback drivers are not used: when you ask for a provider, a failure is reported
+     * instead of being answered by another one.
+     *
+     * @param  string  $driver  openai, anthropic, gemini, xai, an alias (chatgpt, claude, grok) or a name registered with extend()
+     * @param  string|null  $model  A model id of that provider, or null for the configured one
+     *
+     * @throws RuntimeException When no driver has this name
+     */
+    public function using(string $driver, ?string $model = null): self
+    {
+        $manager = $this->manager();
+
+        return new self(
+            $model === null ? $manager->driver($driver) : $manager->build($driver, $model),
+            $manager,
+            useFallbacks: false,
+        );
+    }
 
     /**
      * Generate AI-powered content based on the provided request.
      *
      * This method merges the request parameters with configured defaults,
      * delegates to the AI driver for content generation, and sanitizes
-     * the output for consistent formatting.
+     * the output for consistent formatting. When the text call fails and
+     * fallback drivers are configured, they are tried in order.
      *
      * @param  ContentRequest  $request  The content generation request with topic and options
      * @return ContentResult The generated content including title, intro, text, and SEO fields
      *
-     * @throws \RuntimeException If the AI driver encounters an error
+     * @throws RuntimeException If the AI driver encounters an error
      */
     public function generate(ContentRequest $request): ContentResult
     {
@@ -69,9 +100,27 @@ final class AiGenerator
             imageAspect: $request->imageAspect ?? '16:9',
         );
 
-        $result = $this->driver->generate($merged);
+        try {
+            return $this->sanitize($this->driver->generate($merged));
+        } catch (RuntimeException $e) {
+            $fallbacks = $this->fallbackDrivers();
 
-        return $this->sanitize($result);
+            if ($fallbacks === []) {
+                throw $e;
+            }
+
+            $errors = [$this->driverName($this->driver).': '.$e->getMessage()];
+
+            foreach ($fallbacks as $name) {
+                try {
+                    return $this->sanitize($this->manager()->driver($name)->generate($merged));
+                } catch (RuntimeException $fallbackError) {
+                    $errors[] = $name.': '.$fallbackError->getMessage();
+                }
+            }
+
+            throw new RuntimeException('Every AI driver failed. '.implode(' | ', $errors), 0, $e);
+        }
     }
 
     /**
@@ -101,6 +150,8 @@ final class AiGenerator
             imageUrl: $result->imageUrl,
             imageBase64: $result->imageBase64,
             errorMessage: $result->errorMessage,
+            driver: $result->driver,
+            model: $result->model,
         );
     }
 
@@ -108,61 +159,79 @@ final class AiGenerator
      * Generate only an image without text content.
      *
      * This is a faster method when you only need an image, as it skips
-     * the text generation step entirely.
+     * the text generation step entirely. The image comes from the named
+     * driver, or else from the configured image driver, or else from the
+     * text driver when it can make images and from OpenAI when it cannot.
      *
      * @param  string  $prompt  The image generation prompt (in English preferred)
      * @param  string  $style  Image style: photo, illustration, flat, 3d
      * @param  string  $aspect  Aspect ratio: 1:1, 4:5, 16:9
+     * @param  string|null  $driver  openai, gemini or xai (or an alias), or null for the configured image driver
      * @return array{url?: string|null, base64?: string|null, error?: string}
      */
-    public function generateImage(string $prompt, string $style = 'photo', string $aspect = '16:9'): array
+    public function generateImage(string $prompt, string $style = 'photo', string $aspect = '16:9', ?string $driver = null): array
     {
-        $apiKey = AiGeneratorConfig::openAiApiKey();
-
-        if ($apiKey === null) {
-            return ['error' => 'OPENAI_API_KEY is not set.'];
-        }
-
-        $url = AiGeneratorConfig::openAiBaseUrl().'/images/generations';
-        $payload = OpenAiDriver::imagePayload($this->enhanceImagePrompt($prompt, $style), $aspect);
-
         try {
-            $response = Http::timeout(120)
-                ->connectTimeout(30)
-                ->retry(1, 1000)
-                ->withToken($apiKey)
-                ->acceptJson()
-                ->asJson()
-                ->post($url, $payload);
-
-            $response->throw();
-
-            $data = $response->json();
-            $first = $data['data'][0] ?? [];
-
-            return [
-                'url' => $first['url'] ?? null,
-                'base64' => $first['b64_json'] ?? null,
-            ];
-
-        } catch (\Exception $e) {
+            $images = $driver === null
+                ? $this->manager()->imageDriverFor($this->driver)
+                : $this->manager()->imageDriver($driver);
+        } catch (RuntimeException $e) {
             return ['error' => $e->getMessage()];
         }
+
+        if ($images === null) {
+            $name = $driver ?? AiGeneratorConfig::imageDriver() ?? 'this driver';
+            $label = Provider::fromName($name)?->label() ?? $name;
+
+            return ['error' => "{$label} cannot generate images. Use openai, gemini or xai as image driver."];
+        }
+
+        return $images->generateImage(ContentPrompt::styledImagePrompt($prompt, $style), $aspect, timeout: 120, attempts: 1);
     }
 
     /**
-     * Enhance the image prompt with style instructions.
+     * The drivers to try after the bound one failed, without the bound one and without a
+     * provider whose API key is not set.
+     *
+     * @return list<string>
      */
-    private function enhanceImagePrompt(string $prompt, string $style): string
+    private function fallbackDrivers(): array
     {
-        $stylePrefix = match ($style) {
-            'photo' => 'Professional high-quality photograph of',
-            'illustration' => 'Digital illustration of',
-            'flat' => 'Flat design vector illustration of',
-            '3d' => '3D rendered image of',
-            default => '',
-        };
+        if (! $this->useFallbacks) {
+            return [];
+        }
 
-        return $stylePrefix ? "{$stylePrefix} {$prompt}. No text or watermarks." : $prompt;
+        $manager = $this->manager();
+        $current = $this->driverName($this->driver);
+        $names = [];
+
+        foreach (AiGeneratorConfig::fallbacks() as $name) {
+            $name = $manager->normalize($name);
+            $provider = Provider::fromName($name);
+
+            if ($name === $current || in_array($name, $names, true)) {
+                continue;
+            }
+
+            if ($provider !== null && AiGeneratorConfig::apiKey($provider) === null) {
+                continue;
+            }
+
+            $names[] = $name;
+        }
+
+        return $names;
+    }
+
+    private function driverName(AiContentDriver $driver): string
+    {
+        return $driver instanceof Drivers\Driver
+            ? $driver->provider()->value
+            : $this->manager()->normalize(AiGeneratorConfig::driver());
+    }
+
+    private function manager(): AiGeneratorManager
+    {
+        return $this->manager ?? app(AiGeneratorManager::class);
     }
 }

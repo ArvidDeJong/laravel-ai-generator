@@ -2,27 +2,56 @@
 # Rendered on faq.md, in the FAQPage structured data and in llms.txt.
 - q: What is darvis/laravel-ai-generator?
   a: >-
-    A Laravel package that writes structured content with OpenAI. You pass a `ContentRequest` with a
+    A Laravel package that writes structured content with Claude, ChatGPT, Gemini or Grok. You pass a
+    `ContentRequest` with a
     topic and get a `ContentResult` with a title, a plain text intro, the main text as HTML, an SEO
     title, a meta description and optionally an image. It has no screens, routes or database tables;
     you call it from your own code and store the result yourself.
 
-- q: How do I generate a blog post with OpenAI in a Laravel application?
+- q: How do I generate a blog post with AI in a Laravel application?
   a: >-
-    Run `composer require darvis/laravel-ai-generator`, set `OPENAI_API_KEY` in `.env` and call
+    Run `composer require darvis/laravel-ai-generator` and `php artisan ai-generator:install` to set
+    the API key of Claude, ChatGPT, Gemini or Grok, then call
     `AiGenerator::generate(new ContentRequest(topic: 'Your topic', includeImage: false))` on the facade
     `Darvis\LaravelAiGenerator\Facades\AiGenerator`. The result has `title`, `intro`, `text` as HTML
     with h2, p and list tags, `seoTitle` and `seoDescription`.
 
 - q: What do I need to use darvis/laravel-ai-generator, and what does it cost?
   a: >-
-    PHP 8.2 or higher, Laravel 11, 12 or 13, and an OpenAI API key. The package is free and MIT
-    licensed. OpenAI bills every call to your own OpenAI account.
+    PHP 8.2 or higher, Laravel 11, 12 or 13, and an API key of at least one provider: Anthropic
+    (Claude), OpenAI (ChatGPT), Google (Gemini) or xAI (Grok). The package is free and MIT licensed.
+    The provider bills every call to your own account. Run `php artisan ai-generator:install` to set
+    up the keys.
+
+- q: Does my ChatGPT Plus or Claude Pro subscription work with this package?
+  a: >-
+    No. A chat subscription such as ChatGPT Plus, Claude Pro, Google AI Pro or SuperGrok does not
+    include API access. You create a developer account at the provider, load credits or add billing,
+    and create an API key there. The API keys page of the documentation shows the steps per provider.
+
+- q: Can I use Claude and ChatGPT together?
+  a: >-
+    Yes. Put both keys in `.env`, set `AI_GENERATOR_DRIVER=anthropic` so Claude writes, and OpenAI
+    makes the images because Claude cannot. Add `AI_GENERATOR_FALLBACKS=openai` to let OpenAI write
+    when Claude fails, and use `AiGenerator::using('openai')` to pick a provider for one call. The
+    wizard sets this up for you.
+
+- q: Which provider makes the images?
+  a: >-
+    The driver in `AI_GENERATOR_IMAGE_DRIVER` when you set it: `openai`, `gemini` or `xai`. Otherwise
+    the text driver when it can make images, and OpenAI when it cannot. Claude has no image model, so
+    with Claude as text driver the image comes from OpenAI and needs `OPENAI_API_KEY`.
+
+- q: Do I need MCP to use darvis/laravel-ai-generator?
+  a: >-
+    No. MCP is an extra that lets an assistant such as Claude Code generate content through your app.
+    Install `laravel/mcp` (Laravel 12.41 or newer) and the package registers a local server by itself;
+    connect it with `claude mcp add ai-generator -- php artisan mcp:start ai-generator`.
 
 - q: Does every request also generate an image?
   a: >-
     Yes, unless you say otherwise. `includeImage` is true by default, which means a second, billed call
-    to the OpenAI image API after the text. Pass `includeImage: false` when you only want text. For
+    to the image provider after the text. Pass `includeImage: false` when you only want text. For
     an image without text, use `generateImage()`.
 
 - q: Which languages can darvis/laravel-ai-generator write in?
@@ -32,11 +61,12 @@
     For Dutch, German and French the prompt also names the form of address that fits the tone, for
     example je/jij or Sie.
 
-- q: Can I use another AI provider or a local model instead of OpenAI?
+- q: Can I use a provider or a local model the package does not ship?
   a: >-
-    Yes, for the text. Write a class that implements `AiContentDriver` and bind it in a service provider
-    of your own; the custom drivers page shows the exact code. `generateImage()` always calls the OpenAI
-    image API, whatever driver writes the text.
+    Yes, for the text. Write a class that implements `AiContentDriver` and register it with
+    `app(AiGeneratorManager::class)->extend('name', fn () => new YourDriver)`; the custom drivers page
+    shows the exact code. Images then come from OpenAI, or from the driver in
+    `AI_GENERATOR_IMAGE_DRIVER`.
 
 - q: Is it safe to output the generated HTML directly in a Blade view?
   a: >-
@@ -44,21 +74,22 @@
     does not sanitise it. Run it through an HTML sanitiser with an allow list before you render it
     unescaped.
 
-- q: What happens when the OpenAI API fails?
+- q: What happens when the AI provider fails?
   a: >-
     A failing text call is tried twice and then throws a `RuntimeException`, for example
-    `OpenAI request failed: ...`. A failing image call does not throw. You then get the text with
+    `Claude request failed: ...`. With `AI_GENERATOR_FALLBACKS` set, the next provider is tried first.
+    A failing image call does not throw. You then get the text with
     `errorMessage` filled in and `hasError()` returning true, so check that before you save the result
     as complete.
 
 - q: How do I generate many articles in Laravel without timeouts?
   a: >-
-    Put each `generate()` call in a queued job. Every request inside `generate()` waits up to
-    `OPENAI_TIMEOUT` seconds, 45 by default, and is tried twice, and an image adds a second request.
+    Put each `generate()` call in a queued job. Every request inside `generate()` waits up to the
+    timeout of its provider, 45 seconds by default, and is tried twice, and an image adds a second request.
     Give the job a `$timeout` above that; the usage page has a job example.
 
-- q: How do I test code that uses darvis/laravel-ai-generator without calling OpenAI?
+- q: How do I test code that uses darvis/laravel-ai-generator without calling a real AI API?
   a: >-
     Bind a fake `AiContentDriver` in the test that returns a fixed `ContentResult`, or use `Http::fake()`
-    with an answer in the shape of the OpenAI Responses API. Add `Http::preventStrayRequests()` so a
+    with an answer in the shape of the provider's API. Add `Http::preventStrayRequests()` so a
     forgotten fake fails the test. The testing page has complete examples.

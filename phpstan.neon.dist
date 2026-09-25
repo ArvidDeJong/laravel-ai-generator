@@ -5,3 +5,8 @@ parameters:
     level: 8
     paths:
         - src
+    excludePaths:
+        # src/Mcp extends laravel/mcp, an optional dependency that needs Laravel 12.41+. It is not a
+        # dev dependency because the CI matrix also installs Laravel 11, so CI cannot load it.
+        # Analyse it locally with laravel/mcp installed: composer require --dev laravel/mcp
+        - src/Mcp

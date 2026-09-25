@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Claude, Gemini and Grok.** Three new drivers next to OpenAI: `anthropic` (Messages API with
+  structured outputs), `gemini` (`generateContent` with a JSON schema) and `xai` (chat completions
+  with a strict JSON schema). The aliases `chatgpt`, `claude`, `google` and `grok` work too. Set
+  `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` or `XAI_API_KEY` and `AI_GENERATOR_DRIVER`.
+- **Several providers at once.** `AiGenerator::using('anthropic')` or `using('openai', 'model-id')`
+  writes one call with another provider or model. `AI_GENERATOR_IMAGE_DRIVER` picks the provider
+  for images (Claude has no image model, so with Claude as text driver the image comes from OpenAI
+  unless you set it). `AI_GENERATOR_FALLBACKS=anthropic,openai` lists providers that take over when
+  the text call of the default driver fails.
+- `generateImage()` takes an optional fourth argument, the driver that makes the image.
+- `ContentResult` has two new properties, `driver` and `model`, that say who wrote the text.
+- **Setup wizard:** `php artisan ai-generator:install` asks which providers you have a key for,
+  checks every key with the provider, lets you pick the text and image model from the list your
+  key may use, asks for the default, image and fallback drivers and writes `.env`.
+- `php artisan ai-generator:status` shows every provider and checks the keys at no cost;
+  `--test=claude` generates one short, billed text.
+- **MCP server:** with `laravel/mcp` (Laravel 12.41 or newer) installed, the package registers the
+  local MCP server `ai-generator` with the tools `list-providers`, `generate-content` and
+  `generate-image`. `AI_GENERATOR_MCP=false` turns it off.
+- `AiGeneratorManager` builds the drivers by name; register a driver of your own with
+  `extend('name', fn ($app, ?string $model) => new YourDriver)`.
+- The `AiImageDriver` contract for drivers that make images. `AiContentDriver` is unchanged, so a
+  custom driver keeps working.
+- Documentation: a beginners' guide to creating API keys for every provider and keeping them
+  secret, and pages about multiple providers and the MCP server.
+
+### Changed
+- The package now requires `illuminate/console` and `laravel/prompts` for the wizard. Both come
+  with every Laravel application.
+- An empty `OPENAI_TEMPERATURE` now sends no temperature instead of `0`, for OpenAI models that
+  reject one.
+- `generateImage()` now uses the image driver instead of always OpenAI. For an application with
+  the `openai` driver or a custom driver nothing changes: that image driver is OpenAI.
+
 ## [1.1.2] - 2026-09-21
 
 ### Fixed

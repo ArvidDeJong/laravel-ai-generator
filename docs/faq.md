@@ -1,7 +1,7 @@
 ---
 title: "FAQ"
-nav_order: 9
-description: "Short answers about darvis/laravel-ai-generator: what it is, what it needs and costs, the default image, other AI providers, failures, testing and HTML safety."
+nav_order: 12
+description: "Short answers about darvis/laravel-ai-generator: providers, API keys and subscriptions, costs, the default image, MCP, failures, testing and HTML safety."
 faq: true
 ---
 
