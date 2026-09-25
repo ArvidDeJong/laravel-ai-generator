@@ -26,7 +26,7 @@ afterEach(function () {
 test('a Claude and a ChatGPT key: Claude writes, OpenAI draws, OpenAI takes over on a failure', function () {
     Http::fake([
         'api.anthropic.com/v1/models*' => Http::response(['data' => [['id' => 'claude-sonnet-5'], ['id' => 'claude-opus-5-5']]]),
-        'api.openai.com/v1/models' => Http::response(['data' => [['id' => 'gpt-4.1-mini'], ['id' => 'gpt-image-1'], ['id' => 'whisper-1']]]),
+        'api.openai.com/v1/models' => Http::response(['data' => [['id' => 'gpt-4.1-mini'], ['id' => 'gpt-image-2'], ['id' => 'gpt-image-1'], ['id' => 'whisper-1']]]),
     ]);
 
     $this->artisan('ai-generator:install')
@@ -47,8 +47,9 @@ test('a Claude and a ChatGPT key: Claude writes, OpenAI draws, OpenAI takes over
             'gpt-4.1-mini' => 'gpt-4.1-mini (current)',
             '__other__' => 'Another model, type its id',
         ])
-        ->expectsChoice('Which OpenAI model makes images?', 'gpt-image-1', [
-            'gpt-image-1' => 'gpt-image-1 (current)',
+        ->expectsChoice('Which OpenAI model makes images?', 'gpt-image-2', [
+            'gpt-image-2' => 'gpt-image-2 (current)',
+            'gpt-image-1' => 'gpt-image-1',
             '__other__' => 'Another model, type its id',
         ])
         ->expectsChoice('Which provider writes the text by default?', 'anthropic', [
@@ -68,7 +69,7 @@ test('a Claude and a ChatGPT key: Claude writes, OpenAI draws, OpenAI takes over
         ->toContain("ANTHROPIC_API_KEY=sk-ant-secret-1234\n")
         ->toContain("ANTHROPIC_MODEL=claude-opus-5-5\n")
         ->toContain("OPENAI_API_KEY=sk-proj-secret-5678\n")
-        ->toContain("OPENAI_IMAGE_MODEL=gpt-image-1\n")
+        ->toContain("OPENAI_IMAGE_MODEL=gpt-image-2\n")
         ->toContain("AI_GENERATOR_DRIVER=anthropic\n")
         ->toContain("AI_GENERATOR_IMAGE_DRIVER=openai\n")
         ->toContain("AI_GENERATOR_FALLBACKS=openai\n");

@@ -27,4 +27,4 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Never call a real AI API from a test.
 - Never send a temperature to Claude by default: Opus 5.5, Opus 5 and Sonnet 5 answer HTTP 400 on one. The same goes for OpenAI reasoning models, which is why an empty `OPENAI_TEMPERATURE` sends none.
 - Never make the MCP server public from the package: it only registers `Mcp::local()`. A web server spends the app's credits, so it is the host app's choice, behind its own auth.
-- Model ids age fast. The defaults are in `Provider` and the config file; the wizard lists the models the key may use, so a stale default is a nuisance, not a dead end. `gpt-image-1` shuts down on 2026-12-01 according to OpenAI.
+- Model ids age fast. The defaults are in `Provider` and the config file; the wizard lists the models the key may use, so a stale default is a nuisance, not a dead end. The OpenAI image default is `gpt-image-2` since 1.3.0, because `gpt-image-1` shuts down on 2026-10-23 (not 2026-12-01, as 1.2.0 wrote).

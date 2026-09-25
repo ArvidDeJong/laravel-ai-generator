@@ -72,7 +72,7 @@ image API with `OPENAI_IMAGE_MODEL`.
 | --- | --- |
 | `$prompt` | What the image shows, preferably in English. |
 | `$style` | `photo`, `illustration`, `flat` or `3d`. The style becomes a prefix of the prompt and `No text or watermarks.` is added. Any other value sends the prompt unchanged. |
-| `$aspect` | `1:1`, `4:5` or `16:9`. Gemini gets the ratio; Grok gets it too, with `3:4` for `4:5`. With OpenAI only a model name that contains `dall-e-3` gets a matching size; other models get `1024x1024`. |
+| `$aspect` | `1:1`, `4:5` or `16:9`. Gemini gets the ratio; Grok gets it too, with `3:4` for `4:5`. With OpenAI a GPT Image model gets `1536x1024` (`16:9`), `1024x1536` (`4:5`) or `1024x1024`; a `dall-e-3` model gets its own sizes; other models get `1024x1024`. |
 | `$driver` | `openai`, `gemini`, `xai` or an alias, or `null` for the rules above. |
 
 It returns an array and does not throw:
@@ -252,7 +252,7 @@ Every method is static.
 | `defaultTone()` | `string` | `defaults.tone` | `informal` |
 | `openAiApiKey()` | `?string` | `drivers.openai.api_key` | `null`, also for an empty string |
 | `openAiBaseUrl()` | `string` | `drivers.openai.base_url` | `https://api.openai.com/v1`, without a trailing slash |
-| `openAiImageModel()` | `string` | `drivers.openai.image_model` | `gpt-image-1` |
+| `openAiImageModel()` | `string` | `drivers.openai.image_model` | `gpt-image-2` |
 | `openAiModel()` | `string` | `drivers.openai.model` | `gpt-4.1-mini` |
 | `openAiTemperature()` | `float` | `drivers.openai.temperature` | `0.7` |
 | `openAiTimeout()` | `int` | `drivers.openai.timeout` | `45` |

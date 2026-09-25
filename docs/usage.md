@@ -239,11 +239,15 @@ your image model returns before you rely on the `.png` extension.
 ### The image size and the aspect ratio {#image-size}
 
 Gemini gets the ratio you ask for. Grok too, except `4:5`, which it does not offer: the package asks
-for `3:4` instead. With OpenAI the size only follows the ratio with DALL-E 3:
+for `3:4` instead. With OpenAI the size depends on the image model:
 
-When `OPENAI_IMAGE_MODEL` contains `dall-e-3`, the package asks for `1024x1024` (`1:1`), `1024x1792`
-(`4:5`) or `1792x1024` (every other value, including `16:9`). For every other image model, including
-the default `gpt-image-1`, it asks for a square `1024x1024` image.
+- A GPT Image model (the name contains `gpt-image`, like the default `gpt-image-2`) gets the nearest
+  size it offers: `1536x1024` for `16:9`, `1024x1536` for `4:5` and `1024x1024` for `1:1` and any
+  other value. `1536x1024` is 3:2 and `1024x1536` is 2:3, so crop the image when the ratio has to be
+  exact.
+- A `dall-e-3` model gets `1024x1024` (`1:1`), `1024x1792` (`4:5`) or `1792x1024` (every other
+  value, including `16:9`).
+- Any other model gets a square `1024x1024` image.
 
 For a model name that contains `dall-e`, the package asks for base64 output, so `imageBase64` is the
 field that is filled.

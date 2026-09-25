@@ -170,12 +170,19 @@ or `AI_GENERATOR_IMAGE_DRIVER` names one.
 
 ## The image is square although I asked for 16:9
 
-**Cause.** With OpenAI, the package only translates `imageAspect` into a size when
-`OPENAI_IMAGE_MODEL` contains `dall-e-3`. For every other OpenAI model, including the default
-`gpt-image-1`, it asks for `1024x1024`.
+**Cause.** With OpenAI, the package translates `imageAspect` into a size for GPT Image models
+(`gpt-image-...`) and for `dall-e-3`. For any other model name in `OPENAI_IMAGE_MODEL` it asks for
+`1024x1024`. Before 1.3.0 GPT Image models always got a square image too.
 
-**Fix.** Crop the image yourself, or let Gemini or Grok make the image: they get the ratio. See
+**Fix.** Update the package, use a GPT Image model, or let Gemini or Grok make the image. See
 [the image size](usage.md#image-size).
+
+## OpenAI refuses gpt-image-1
+
+**Cause.** OpenAI shuts down `gpt-image-1` on 2026-10-23. The default is `gpt-image-2` since 1.3.0,
+but a `.env` that sets `OPENAI_IMAGE_MODEL=gpt-image-1` keeps asking for the old model.
+
+**Fix.** Set `OPENAI_IMAGE_MODEL=gpt-image-2`, or remove the line.
 
 ## Every request also makes an image, and I did not ask for one
 

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **The default OpenAI image model is now `gpt-image-2`** instead of `gpt-image-1`. OpenAI shuts
+  `gpt-image-1` down on 2026-10-23 and names `gpt-image-2` as its replacement. Is
+  `OPENAI_IMAGE_MODEL=gpt-image-1` set in your `.env`? Change it to `gpt-image-2`, or remove the
+  line; after 2026-10-23 OpenAI refuses the old model. `gpt-image-2` may need the same OpenAI
+  organization verification as `gpt-image-1`.
+- **GPT Image models now follow `imageAspect`.** `16:9` asks for `1536x1024` and `4:5` for
+  `1024x1536`; `1:1` stays `1024x1024`. Before, every GPT Image model got a square image. Crop the
+  image when your layout needs an exact 16:9 or 4:5.
+
+### Fixed
+- The documentation of 1.2.0 said `gpt-image-1` shuts down on 2026-12-01. The date is 2026-10-23.
+
 ## [1.2.0] - 2026-09-25
 
 ### Added

@@ -18,9 +18,25 @@ test('DALL-E 3 gets a size that follows the aspect ratio and base64 output', fun
         ->and(OpenAiDriver::imagePayload('A lighthouse', '1:1')['size'])->toBe('1024x1024');
 });
 
-test('other image models get a square image and no response format', function () {
+test('GPT Image models get a size that follows the aspect ratio and no response format', function () {
     expect(OpenAiDriver::imagePayload('A lighthouse', '16:9'))->toBe([
-        'model' => 'gpt-image-1',
+        'model' => 'gpt-image-2',
+        'prompt' => 'A lighthouse',
+        'size' => '1536x1024',
+    ])
+        ->and(OpenAiDriver::imagePayload('A lighthouse', '4:5')['size'])->toBe('1024x1536')
+        ->and(OpenAiDriver::imagePayload('A lighthouse', '1:1')['size'])->toBe('1024x1024');
+
+    config(['ai-generator.drivers.openai.image_model' => 'gpt-image-2.5-flare']);
+
+    expect(OpenAiDriver::imagePayload('A lighthouse', '16:9')['size'])->toBe('1536x1024');
+});
+
+test('other image models get a square image and no response format', function () {
+    config(['ai-generator.drivers.openai.image_model' => 'some-other-image-model']);
+
+    expect(OpenAiDriver::imagePayload('A lighthouse', '16:9'))->toBe([
+        'model' => 'some-other-image-model',
         'prompt' => 'A lighthouse',
         'size' => '1024x1024',
     ]);
@@ -36,7 +52,8 @@ test('generateImage sends the styled prompt and returns the image as base64', fu
     expect($image)->toBe(['url' => null, 'base64' => 'aGVsbG8=']);
 
     Http::assertSent(fn (Request $request) => $request['prompt'] === 'Digital illustration of a lighthouse at dusk. No text or watermarks.'
-        && $request['model'] === 'gpt-image-1'
+        && $request['model'] === 'gpt-image-2'
+        && $request['size'] === '1024x1024'
         && $request->hasHeader('Authorization', 'Bearer test-api-key'));
 });
 
