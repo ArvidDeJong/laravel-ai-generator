@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-09-25
+
 ### Changed
 - **The default OpenAI image model is now `gpt-image-2`** instead of `gpt-image-1`. OpenAI shuts
   `gpt-image-1` down on 2026-10-23 and names `gpt-image-2` as its replacement. Is
