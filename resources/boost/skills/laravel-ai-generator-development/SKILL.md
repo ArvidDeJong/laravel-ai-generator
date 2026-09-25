@@ -105,7 +105,7 @@ if (isset($image['error'])) {
 }
 ```
 
-With OpenAI the aspect ratio only changes the size with a `dall-e-3` image model; other OpenAI models get a square 1024x1024 image. Gemini follows the ratio, and Grok too, with `3:4` for `4:5`.
+With OpenAI a GPT Image model (default `gpt-image-2`) gets `1536x1024` for `16:9`, `1024x1536` for `4:5` and `1024x1024` otherwise; `dall-e-3` gets its own sizes; any other model gets `1024x1024`. Gemini follows the ratio, and Grok too, with `3:4` for `4:5`.
 
 ## Queue it
 

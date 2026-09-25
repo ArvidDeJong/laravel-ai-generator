@@ -112,7 +112,7 @@ enum Provider: string
         return match ($this) {
             self::Anthropic => null,
             self::Gemini => 'gemini-3.1-flash-image',
-            self::OpenAi => 'gpt-image-1',
+            self::OpenAi => 'gpt-image-2',
             self::Xai => 'grok-imagine-image-2.0',
         };
     }

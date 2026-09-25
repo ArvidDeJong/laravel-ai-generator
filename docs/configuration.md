@@ -34,7 +34,7 @@ Every provider has its own block under `drivers`. You only fill in the providers
 | --- | --- | --- | --- | --- |
 | API key | `OPENAI_API_KEY` | `ANTHROPIC_API_KEY` | `GEMINI_API_KEY` | `XAI_API_KEY` |
 | Text model | `OPENAI_MODEL`, default `gpt-4.1-mini` | `ANTHROPIC_MODEL`, default `claude-sonnet-5` | `GEMINI_MODEL`, default `gemini-3.8-flash` | `XAI_MODEL`, default `grok-4.7` |
-| Image model | `OPENAI_IMAGE_MODEL`, default `gpt-image-1` | none, Claude makes no images | `GEMINI_IMAGE_MODEL`, default `gemini-3.1-flash-image` | `XAI_IMAGE_MODEL`, default `grok-imagine-image-2.0` |
+| Image model | `OPENAI_IMAGE_MODEL`, default `gpt-image-2` | none, Claude makes no images | `GEMINI_IMAGE_MODEL`, default `gemini-3.1-flash-image` | `XAI_IMAGE_MODEL`, default `grok-imagine-image-2.0` |
 | Temperature | `OPENAI_TEMPERATURE`, default `0.7` | `ANTHROPIC_TEMPERATURE`, default none | `GEMINI_TEMPERATURE`, default none | `XAI_TEMPERATURE`, default none |
 | Timeout in seconds | `OPENAI_TIMEOUT`, default `45` | `ANTHROPIC_TIMEOUT`, default `45` | `GEMINI_TIMEOUT`, default `45` | `XAI_TIMEOUT`, default `45` |
 | Base URL | `OPENAI_BASE_URL`, default `https://api.openai.com/v1` | `ANTHROPIC_BASE_URL`, default `https://api.anthropic.com/v1` | `GEMINI_BASE_URL`, default `https://generativelanguage.googleapis.com/v1beta` | `XAI_BASE_URL`, default `https://api.x.ai/v1` |
@@ -54,9 +54,10 @@ reject a temperature too; set `OPENAI_TEMPERATURE=` (empty) when you use one.
 twice. `generateImage()` does not use it: that method has a fixed timeout of 120 seconds and tries
 once.
 
-**Models age.** Providers retire models. OpenAI has announced that `gpt-image-1`, the default image
-model, shuts down on 2026-12-01. Pick another one in `OPENAI_IMAGE_MODEL` before then; the wizard
-lists the image models your key may use. The defaults of the package are unchanged in this release.
+**Models age.** Providers retire models. OpenAI shuts down `gpt-image-1` on 2026-10-23, so since
+1.3.0 the default image model is `gpt-image-2`, the replacement OpenAI names. Is `OPENAI_IMAGE_MODEL`
+set to `gpt-image-1` in your `.env`? Change it to `gpt-image-2`, or remove the line to follow the
+default. The wizard lists the image models your key may use.
 
 ## An example .env
 
@@ -73,7 +74,7 @@ AI_GENERATOR_FALLBACKS=openai
 # Optional: models
 ANTHROPIC_MODEL=claude-sonnet-5
 OPENAI_MODEL=gpt-4.1-mini
-OPENAI_IMAGE_MODEL=gpt-image-1
+OPENAI_IMAGE_MODEL=gpt-image-2
 
 # Optional: defaults for a request
 AI_GENERATOR_LANGUAGE=en
@@ -129,7 +130,7 @@ return [
         'openai' => [
             'api_key' => env('OPENAI_API_KEY'),
             'base_url' => env('OPENAI_BASE_URL', 'https://api.openai.com/v1'),
-            'image_model' => env('OPENAI_IMAGE_MODEL', 'gpt-image-1'),
+            'image_model' => env('OPENAI_IMAGE_MODEL', 'gpt-image-2'),
             'model' => env('OPENAI_MODEL', 'gpt-4.1-mini'),
             'temperature' => env('OPENAI_TEMPERATURE', 0.7),
             'timeout' => env('OPENAI_TIMEOUT', 45),

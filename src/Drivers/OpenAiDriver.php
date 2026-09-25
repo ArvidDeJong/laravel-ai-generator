@@ -106,8 +106,9 @@ final class OpenAiDriver extends Driver implements AiImageDriver
     /**
      * The request body for OpenAI's image generation API.
      *
-     * DALL-E 3 gets a size that follows the aspect ratio and is asked for base64 output; other
-     * models get a square image and their own default response format.
+     * GPT Image models and DALL-E 3 get a size that follows the aspect ratio; other models get a
+     * square image. Only DALL-E models are asked for base64 output: GPT Image models always return
+     * base64 and do not support response_format.
      *
      * @internal
      *
@@ -118,13 +119,19 @@ final class OpenAiDriver extends Driver implements AiImageDriver
         $imageModel = AiGeneratorConfig::openAiImageModel();
         $normalized = strtolower($imageModel);
 
-        $size = str_contains($normalized, 'dall-e-3')
-            ? match ($aspect) {
+        $size = match (true) {
+            str_contains($normalized, 'gpt-image') => match ($aspect) {
+                '16:9' => '1536x1024',
+                '4:5' => '1024x1536',
+                default => '1024x1024',
+            },
+            str_contains($normalized, 'dall-e-3') => match ($aspect) {
                 '1:1' => '1024x1024',
                 '4:5' => '1024x1792',
                 default => '1792x1024',
-            }
-        : '1024x1024';
+            },
+            default => '1024x1024',
+        };
 
         $payload = [
             'model' => $imageModel,

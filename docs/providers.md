@@ -14,7 +14,7 @@ makes the images, and when Claude is down OpenAI writes the text too.
 
 | Driver | Also called | Provider | Text | Images | Default text model | Default image model |
 | --- | --- | --- | --- | --- | --- | --- |
-| `openai` | `chatgpt`, `gpt` | OpenAI | yes | yes | `gpt-4.1-mini` | `gpt-image-1` |
+| `openai` | `chatgpt`, `gpt` | OpenAI | yes | yes | `gpt-4.1-mini` | `gpt-image-2` |
 | `anthropic` | `claude` | Anthropic | yes | **no** | `claude-sonnet-5` | none |
 | `gemini` | `google` | Google | yes | yes | `gemini-3.8-flash` | `gemini-3.1-flash-image` |
 | `xai` | `grok` | xAI | yes | yes | `grok-4.7` | `grok-imagine-image-2.0` |
@@ -91,8 +91,8 @@ $image = AiGenerator::generateImage('A lighthouse at dusk', 'photo', '16:9', 'ge
 
 ### The aspect ratio per provider
 
-- **OpenAI:** only a `dall-e-3` model follows `imageAspect`; other models make a square image. See
-  [the image size](usage.md#image-size).
+- **OpenAI:** a GPT Image model, such as the default `gpt-image-2`, gets the nearest size it offers:
+  `1536x1024` for `16:9` and `1024x1536` for `4:5`. See [the image size](usage.md#image-size).
 - **Gemini:** the ratio (`1:1`, `4:5`, `16:9`) is passed to the model.
 - **Grok:** `1:1` and `16:9` are passed on. Grok has no `4:5`, so the package asks for `3:4`, the
   nearest portrait ratio.
