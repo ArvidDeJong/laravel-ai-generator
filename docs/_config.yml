@@ -1,5 +1,5 @@
 title: Laravel AI Generator
-description: "darvis/laravel-ai-generator writes structured content for a Laravel app with OpenAI: title, intro, HTML text, SEO title and meta description, and an optional image, from one request object."
+description: "darvis/laravel-ai-generator writes structured content for a Laravel app with Claude, ChatGPT, Gemini or Grok: title, intro, HTML text, SEO title and meta description, and an optional image, from one request object. With a setup wizard, fallbacks and an MCP server."
 url: https://arviddejong.github.io
 baseurl: /laravel-ai-generator
 
@@ -16,9 +16,9 @@ package:
   repository: https://github.com/ArvidDeJong/laravel-ai-generator
   packagist: https://packagist.org/packages/darvis/laravel-ai-generator
   license_url: https://github.com/ArvidDeJong/laravel-ai-generator/blob/main/LICENSE
-  requires: "PHP 8.2+, Laravel 11, 12 or 13, an OpenAI API key"
+  requires: "PHP 8.2+, Laravel 11, 12 or 13, an API key of Anthropic (Claude), OpenAI (ChatGPT), Google (Gemini) or xAI (Grok)"
   platforms: [Laravel]
-  keywords: [laravel, openai, ai content generation, ai text generator, blog post generator, seo title, meta description, image generation, openai responses api, laravel boost]
+  keywords: [laravel, openai, chatgpt, claude, anthropic, gemini, grok, xai, ai content generation, ai text generator, blog post generator, seo title, meta description, image generation, mcp server, laravel mcp, laravel boost]
 
 # Developer credit in the footer and the structured data.
 developer:

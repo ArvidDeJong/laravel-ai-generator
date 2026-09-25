@@ -4,6 +4,7 @@ namespace Darvis\LaravelAiGenerator\Tests;
 
 use Darvis\LaravelAiGenerator\AiGeneratorServiceProvider;
 use Illuminate\Foundation\Application;
+use Laravel\Mcp\Server\McpServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
 
 /**
@@ -31,9 +32,12 @@ abstract class TestCase extends Orchestra
      */
     protected function getPackageProviders($app): array
     {
-        return [
+        // laravel/mcp is optional and not a dev dependency (it needs Laravel 12.41+); when it is
+        // installed locally, its provider is loaded so the MCP tests can run.
+        return array_values(array_filter([
+            class_exists(McpServiceProvider::class) ? McpServiceProvider::class : null,
             AiGeneratorServiceProvider::class,
-        ];
+        ]));
     }
 
     /**

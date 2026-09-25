@@ -1,6 +1,6 @@
 {
     "name": "darvis/laravel-ai-generator",
-    "description": "AI content generation service for Laravel applications with OpenAI support",
+    "description": "AI content generation for Laravel with Claude, ChatGPT, Gemini and Grok: articles, SEO fields and images, with a setup wizard and an MCP server",
     "type": "library",
     "license": "MIT",
     "homepage": "https://arviddejong.github.io/laravel-ai-generator/",
@@ -8,9 +8,16 @@
         "laravel",
         "ai",
         "openai",
+        "chatgpt",
+        "anthropic",
+        "claude",
+        "gemini",
+        "grok",
+        "xai",
         "content-generation",
         "seo",
-        "gpt",
+        "image-generation",
+        "mcp",
         "laravel-boost"
     ],
     "authors": [
@@ -26,8 +33,10 @@
     },
     "require": {
         "php": "^8.2",
+        "illuminate/console": "^11.0|^12.0|^13.0",
         "illuminate/http": "^11.0|^12.0|^13.0",
-        "illuminate/support": "^11.0|^12.0|^13.0"
+        "illuminate/support": "^11.0|^12.0|^13.0",
+        "laravel/prompts": "^0.1.20|^0.2|^0.3"
     },
     "require-dev": {
         "larastan/larastan": "^3.0",
@@ -37,6 +46,9 @@
         "pestphp/pest": "^3.0|^4.0",
         "pestphp/pest-plugin-laravel": "^3.0|^4.0",
         "phpunit/phpunit": "^11.0|^12.0|^13.0"
+    },
+    "suggest": {
+        "laravel/mcp": "Required for the MCP server that lets an assistant generate content through your app (^1.0, Laravel 12.41+)."
     },
     "autoload": {
         "psr-4": {

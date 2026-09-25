@@ -1,7 +1,7 @@
 ---
 title: "Troubleshooting"
-nav_order: 7
-description: "Every error message of darvis/laravel-ai-generator with its cause and fix: missing API key, failed requests, timeouts, no image, unknown driver, stale config."
+nav_order: 10
+description: "Every error message of darvis/laravel-ai-generator with its cause and fix: missing or refused API keys, failed requests per provider, no image, fallbacks, stale config."
 ---
 
 # Troubleshooting
@@ -9,16 +9,23 @@ description: "Every error message of darvis/laravel-ai-generator with its cause 
 Each section is a symptom, then the cause, then the fix. The messages are quoted literally from the
 package, so you can search this page for the text you see.
 
-Start with the check that costs nothing: [Check that it works](installation.md#check-that-it-works).
+Start with the check that costs nothing: `php artisan ai-generator:status`. It shows every provider,
+whether its key is set and whether the provider accepts it. See
+[Check that it works](installation.md#check-that-it-works).
 
-## "OPENAI_API_KEY is not set." {#api-key-not-set}
+In the messages below, **Provider** is `OpenAI`, `Claude`, `Gemini` or `Grok`, and the key variable is
+`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` or `XAI_API_KEY`.
+
+## "OPENAI_API_KEY is not set." (or ANTHROPIC_, GEMINI_, XAI_) {#api-key-not-set}
 
 **Symptom.** `generate()` throws a `RuntimeException` with this message, or `generateImage()` returns
-`['error' => 'OPENAI_API_KEY is not set.']`. No request was sent.
+`['error' => 'OPENAI_API_KEY is not set.']`. No request was sent. The variable in the message tells
+you which provider was asked.
 
-**Cause.** The config value `ai-generator.drivers.openai.api_key` is empty. Usually one of these:
+**Cause.** The API key of that provider is empty. Usually one of these:
 
-1. `OPENAI_API_KEY` is missing from `.env`, or it is in `.env.example` instead of `.env`.
+1. The key is missing from `.env`, or it is in `.env.example` instead of `.env`. Run
+   `php artisan ai-generator:install`, or see [Get your API keys](api-keys.md).
 2. The config is cached. With a cached config Laravel does not read `.env` any more.
 3. You published `config/ai-generator.php` and changed the `api_key` line.
 4. A queue worker was started before you added the key. A worker keeps the application, and its
@@ -32,52 +39,110 @@ php artisan queue:restart
 ```
 
 Then check that `config/ai-generator.php`, when it exists in your application, still has
-`'api_key' => env('OPENAI_API_KEY')`.
+`'api_key' => env('OPENAI_API_KEY')` (or the variable of your provider). A config file published
+with an older version has no block for Claude, Gemini or Grok; that is fine, the package then uses its
+own defaults and reads the key from `.env` all the same.
 
-## "OpenAI request failed: HTTP request returned status code ..."
+Did you not expect this provider to be called at all? Look at `AI_GENERATOR_DRIVER`,
+`AI_GENERATOR_IMAGE_DRIVER` and `AI_GENERATOR_FALLBACKS`. With Claude as text driver the image comes
+from OpenAI unless you set another image driver.
+
+## "... refused the API key (HTTP 401)." {#key-refused}
+
+**Symptom.** The wizard or `php artisan ai-generator:status` shows, for example,
+`Claude refused the API key (HTTP 401).` The status may also be 400 or 403.
+
+**Cause.** The provider does not accept the key: a typing error, a revoked key, a key of another
+account, or (with Gemini) an old key type that Google no longer accepts.
+
+**Fix.** Create a new key and paste it again; [Get your API keys](api-keys.md) shows where. Check
+that there are no spaces or quotes around the key in `.env`. Some providers also refuse calls when
+your account has no credits.
+
+## "OpenAI request failed: HTTP request returned status code ..." (or Claude, Gemini, Grok)
 
 **Symptom.** `generate()` throws a `RuntimeException` that starts with `OpenAI request failed:`,
-followed by Laravel's message `HTTP request returned status code` with the status and the start of
-OpenAI's answer.
+`Claude request failed:`, `Gemini request failed:` or `Grok request failed:`, followed by Laravel's
+message `HTTP request returned status code` with the status and the start of the provider's answer.
 
-**Cause.** OpenAI answered with a 4xx or 5xx status, on both attempts. The answer of OpenAI in the
-message says why. The status tells you where to look:
+**Cause.** The provider answered with a 4xx or 5xx status, on both attempts. The answer of the
+provider in the message says why. The status tells you where to look:
 
 | Status | Look at |
 | --- | --- |
-| 401 (unauthorized) | The API key in `OPENAI_API_KEY`. |
-| 400 or 404 (bad request, not found) | What the package sent: `OPENAI_MODEL`, `OPENAI_TEMPERATURE` and `OPENAI_BASE_URL`. The package always sends a `temperature` and a strict JSON schema. |
-| 429 (too many requests) | The limits of your OpenAI account. |
-| 5xx (server error) | The other side. Try again later. |
+| 401 or 403 (unauthorized, forbidden) | The API key of that provider. |
+| 400 or 404 (bad request, not found) | The model name (`OPENAI_MODEL`, `ANTHROPIC_MODEL`, `GEMINI_MODEL`, `XAI_MODEL`), the temperature and the base URL. A model that was retired gives a 404. A model that rejects a temperature gives a 400: leave `ANTHROPIC_TEMPERATURE` empty, and set `OPENAI_TEMPERATURE=` (empty) for OpenAI reasoning models. |
+| 402 or 429 (payment required, too many requests) | The credits and limits of your account at the provider. |
+| 5xx (server error) | The other side. Try again later, or set [fallbacks](providers.md#fallbacks-another-provider-takes-over). |
 
 **Fix.** Read the rest of the message, correct the setting it points at, and run
 `php artisan config:clear` when your config is cached.
 
-## "OpenAI connection failed: ..."
+## "OpenAI connection failed: ..." (or Claude, Gemini, Grok)
 
-**Symptom.** `generate()` throws a `RuntimeException` that starts with `OpenAI connection failed:`.
+**Symptom.** `generate()` throws a `RuntimeException` that starts with `OpenAI connection failed:`,
+or the same with `Claude`, `Gemini` or `Grok`.
 
-**Cause.** No answer arrived within `OPENAI_TIMEOUT` seconds (45 by default), on both attempts, or the
-host could not be reached at all.
+**Cause.** No answer arrived within the timeout of that provider (45 seconds by default), on both
+attempts, or the host could not be reached at all.
 
 **Fix.**
 
-- Raise the timeout in `.env`, for example `OPENAI_TIMEOUT=90`.
-- Check `OPENAI_BASE_URL` when you changed it.
+- Raise the timeout in `.env`, for example `OPENAI_TIMEOUT=90` or `ANTHROPIC_TIMEOUT=90`.
+- Check the base URL (`OPENAI_BASE_URL` and so on) when you changed it.
 - Check that the server may make outgoing HTTPS requests.
 - Generate in a [queued job](usage.md#queued-job), so a slow answer does not block a visitor.
 
-## "OpenAI returned non-JSON output (unexpected)." or "OpenAI response did not include output_text."
+## "... returned non-JSON output (unexpected)." or an answer without text
 
-**Symptom.** `generate()` throws a `RuntimeException` with one of these two messages.
+**Symptom.** `generate()` throws a `RuntimeException` with one of these messages:
 
-**Cause.** The request succeeded, but the answer did not have the shape of the OpenAI Responses API,
-or the text in it was not the JSON object the package asked for.
+- `OpenAI returned non-JSON output (unexpected).` (or `Claude`, `Gemini`, `Grok`)
+- `OpenAI response did not include output_text.`
+- `Claude response did not include a text block.`
+- `Gemini response did not include text (finish reason: ...).`
+- `Grok response did not include message content.`
 
-**Fix.** Check `OPENAI_BASE_URL` and `OPENAI_MODEL`: the endpoint and the model have to support the
-Responses API with a JSON schema. In a test, check the shape of your fake on [Testing](testing.md).
+**Cause.** The request succeeded, but the answer did not have the shape the driver expects, or the
+text in it was not the JSON object the package asked for. For Gemini the finish reason says why it
+stopped, for example `SAFETY` or `MAX_TOKENS`.
 
-## The text is there, but there is no image
+**Fix.** Check the model and the base URL of that provider: the model has to support structured
+output with a JSON schema. Try the default model. In a test, check the shape of your fake on
+[Testing](testing.md).
+
+## "Claude stopped before the answer was complete. Raise ANTHROPIC_MAX_TOKENS or lower maxWords."
+
+**Cause.** Claude reached its maximum answer length, `ANTHROPIC_MAX_TOKENS` (8192 by default), before
+the JSON was complete.
+
+**Fix.** Raise `ANTHROPIC_MAX_TOKENS`, for example to `16000`, or ask for fewer words with `maxWords`.
+
+## "Claude declined to write about this topic." or "Grok declined to write about this topic: ..."
+
+**Cause.** The model refused the request, usually because of the topic.
+
+**Fix.** Rephrase the topic, or try another provider with `AiGenerator::using()`.
+
+## "Gemini blocked the prompt: ..."
+
+**Cause.** Google's safety filter blocked the prompt before the model answered. The reason follows
+the colon, for example `SAFETY`.
+
+**Fix.** Rephrase the topic, or try another provider.
+
+## "Every AI driver failed. ..."
+
+**Symptom.** A `RuntimeException` like
+`Every AI driver failed. anthropic: Claude request failed: ... | openai: OpenAI connection failed: ...`.
+
+**Cause.** You set `AI_GENERATOR_FALLBACKS`, the default driver failed and every fallback driver
+failed too. Every part of the message is the error of one driver.
+
+**Fix.** Handle each part with the section of that message on this page. `getPrevious()` gives the
+exception of the default driver.
+
+## The text is there, but there is no image {#no-image}
 
 **Symptom.** `hasImage()` is `false`.
 
@@ -85,7 +150,10 @@ Responses API with a JSON schema. In a test, check the shape of your fake on [Te
 
 | What you see | Cause | Fix |
 | --- | --- | --- |
-| `errorMessage` starts with `OpenAI Image Error:` | The image request failed on both attempts. The rest of the message is the HTTP status or the timeout. | A status: check `OPENAI_IMAGE_MODEL` and whether your OpenAI account may use it. A timeout: raise `OPENAI_TIMEOUT`, which also counts for the image inside `generate()`. |
+| `errorMessage` starts with `OpenAI Image Error:`, `Gemini Image Error:` or `Grok Image Error:` | The image request failed on both attempts. The rest of the message is the reason: a missing key, the HTTP status or the timeout. | A missing key: set the key of the image provider, or choose another one with `AI_GENERATOR_IMAGE_DRIVER`. A status: check the image model (`OPENAI_IMAGE_MODEL` and so on) and whether your account may use it. A timeout: raise the timeout of that provider. |
+| `errorMessage` is `OpenAI Image Error: OPENAI_API_KEY is not set.` while you write with Claude | Claude makes no images, so the package asks OpenAI. | Set `OPENAI_API_KEY`, or `AI_GENERATOR_IMAGE_DRIVER=gemini` or `xai` with that key, or pass `includeImage: false`. |
+| `errorMessage` ends with `cannot generate images. Set AI_GENERATOR_IMAGE_DRIVER to openai, gemini or xai.` | `AI_GENERATOR_IMAGE_DRIVER` names a driver without images, such as `anthropic`. | Set it to `openai`, `gemini` or `xai`. |
+| `errorMessage` is `Gemini Image Error: Gemini returned no image.` | Gemini answered, but without an image part. | Try again, or use another `GEMINI_IMAGE_MODEL`. |
 | `imagePrompt` is `null` | The request had `includeImage: false`. | Pass `includeImage: true` or leave the argument out. |
 | `imagePrompt` is an empty string and there is no error | The model wrote no image prompt, so the package sent no image request. | Generate again, or call `generateImage()` with a prompt of your own. |
 | No image, no error, and you use a custom driver | The package does not make the image for a custom driver. | Let your driver do it, or call `generateImage()`; see [Custom drivers](custom-drivers.md). |
@@ -93,33 +161,43 @@ Responses API with a JSON schema. In a test, check the shape of your fake on [Te
 A failed image never throws. The text is complete, so you can save it and try the image again with
 `generateImage($result->imagePrompt)`.
 
+## generateImage() returns "... cannot generate images. Use openai, gemini or xai as image driver."
+
+**Cause.** You passed a driver without images, for example `generateImage($prompt, 'photo', '16:9', 'claude')`,
+or `AI_GENERATOR_IMAGE_DRIVER` names one.
+
+**Fix.** Pass `openai`, `gemini` or `xai`, or leave the argument out.
+
 ## The image is square although I asked for 16:9
 
-**Cause.** The package only translates `imageAspect` into a size when `OPENAI_IMAGE_MODEL` contains
-`dall-e-3`. For every other model, including the default `gpt-image-1`, it asks for `1024x1024`.
+**Cause.** With OpenAI, the package only translates `imageAspect` into a size when
+`OPENAI_IMAGE_MODEL` contains `dall-e-3`. For every other OpenAI model, including the default
+`gpt-image-1`, it asks for `1024x1024`.
 
-**Fix.** Crop the image yourself, or use a `dall-e-3` model. See [the image size](usage.md#image-size).
+**Fix.** Crop the image yourself, or let Gemini or Grok make the image: they get the ratio. See
+[the image size](usage.md#image-size).
 
 ## Every request also makes an image, and I did not ask for one
 
 **Cause.** `includeImage` is `true` by default.
 
 **Fix.** Pass `includeImage: false` in every `ContentRequest` that only needs text. It saves the
-second, billed call to OpenAI.
+second, billed call to the image provider.
 
 ## "Unsupported AI driver: ..." {#unsupported-driver}
 
 **Symptom.** A `RuntimeException` with this message, as soon as something asks for the generator or
 the facade.
 
-**Cause.** `AI_GENERATOR_DRIVER` holds a name other than `openai`, and no binding of your own replaced
-the one of the package.
+**Cause.** `AI_GENERATOR_DRIVER`, a name passed to `using()`, or a name in `AI_GENERATOR_IMAGE_DRIVER`
+or `generateImage()` is not one the package knows. The package knows `openai`, `anthropic`, `gemini`
+and `xai`, and the aliases `chatgpt`, `gpt`, `claude`, `google` and `grok`.
 
 **Fix.**
 
-- You don't have a driver of your own: remove `AI_GENERATOR_DRIVER` from `.env` or set it to `openai`.
-- You do: check that your service provider is registered, that it binds `AiContentDriver` in
-  `register()`, and that the name in its `if` equals `AI_GENERATOR_DRIVER`. Don't use `extend()`. See
+- Check the spelling. `grok` works, `x.ai` does not.
+- You have a driver of your own: check that it is registered with the manager's `extend()` under this
+  exact name, or that your binding replaces the one of the package. See
   [Custom drivers](custom-drivers.md).
 
 Then run `php artisan config:clear`.
@@ -147,9 +225,9 @@ driver.
 
 ## The job fails with a timeout, or runs twice
 
-**Cause.** One `generate()` with an image can take four waits of `OPENAI_TIMEOUT` seconds in the
-worst case: two attempts for the text, two for the image. With the default of 45 seconds that is
-more than the 60 seconds a queue worker gives a job by default.
+**Cause.** One `generate()` with an image can take four waits of the provider timeout in the worst
+case: two attempts for the text, two for the image. With the default of 45 seconds that is more than
+the 60 seconds a queue worker gives a job by default. Every fallback driver adds two more attempts.
 
 **Fix.** Give the job a `$timeout` above that worst case and keep the `retry_after` of the queue
 connection above the `$timeout`. The example on [Usage](usage.md#queued-job) sets both `$timeout`
@@ -158,4 +236,5 @@ and `$tries`.
 ## Still stuck
 
 Open an [issue](https://github.com/ArvidDeJong/laravel-ai-generator/issues/new/choose) with the
-package version, the Laravel version, the model names and the full message. Leave your API key out.
+package version, the Laravel version, the provider, the model names and the full message. Leave your
+API key out.

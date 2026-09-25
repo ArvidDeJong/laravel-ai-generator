@@ -1,13 +1,15 @@
 ---
 title: "Custom drivers"
-nav_order: 5
-description: "Let another AI provider write the text: implement the AiContentDriver contract, keep its settings in config/services.php and replace the container binding."
+nav_order: 8
+description: "Add an AI provider the package does not ship: implement the AiContentDriver contract, keep its settings in config/services.php and register it with extend()."
 ---
 
 # Custom drivers
 
-A driver is the class that talks to the AI provider. The package ships one, for OpenAI. To let
-another provider write the text, you write a class with one method and tell Laravel to use it.
+A driver is the class that talks to the AI provider. The package ships four: OpenAI, Claude
+(Anthropic), Gemini and Grok (xAI); see [Multiple providers](providers.md). This page is for any
+other provider, for example a local model or a provider of your own. You write a class with one
+method and register it under a name.
 
 ## What a driver has to do
 
@@ -23,9 +25,10 @@ public function generate(ContentRequest $request): ContentResult;
   package trims them afterwards.
 - Throw a `RuntimeException` when the text fails, so calling code can handle your driver the same
   way as the OpenAI driver.
-- The image is your driver's job too. The package does not make an image for a custom driver, so
-  `includeImage` does nothing unless your driver acts on it. When an image fails, return the text
-  with `errorMessage` filled instead of throwing.
+- The image is your driver's job too. The package does not make an image inside `generate()` for a
+  custom driver, so `includeImage` does nothing unless your driver acts on it. When an image fails,
+  return the text with `errorMessage` filled instead of throwing. `generateImage()` does work: it
+  uses OpenAI, or the driver in `AI_GENERATOR_IMAGE_DRIVER`.
 
 ## Step 1: write the driver
 
@@ -128,11 +131,40 @@ ACME_AI_MODEL=the-model-name-from-your-provider
 ACME_AI_URL=https://api.your-provider.example/v1
 ```
 
-## Step 3: replace the binding
+## Step 3: register the driver under a name
 
-A binding tells Laravel's service container which class to build when code asks for an interface.
-The package binds `AiContentDriver` to its OpenAI driver. Bind your own class in a service provider
-of your application, and the package uses yours.
+Register the driver with the driver manager of the package, in the `boot()` method of a service
+provider of your application, for example `AppServiceProvider`:
+
+**`app/Providers/AppServiceProvider.php`**
+
+```php
+use App\Services\AiDrivers\AcmeAiDriver;
+use Darvis\LaravelAiGenerator\AiGeneratorManager;
+
+public function boot(): void
+{
+    $this->app->make(AiGeneratorManager::class)
+        ->extend('acme', fn ($app, ?string $model) => new AcmeAiDriver);
+}
+```
+
+The closure gets the container and the model asked for with `using()`, or `null`. Now the name
+`acme` works everywhere a driver name does:
+
+- `AI_GENERATOR_DRIVER=acme` in `.env` makes it the default.
+- `AiGenerator::using('acme')->generate($request)` uses it for one call.
+- `AI_GENERATOR_FALLBACKS=acme` lets it take over when the default driver fails.
+
+A driver registered with `extend()` never needs an API key check by the package; your driver checks
+its own key.
+
+### Or replace the binding
+
+Earlier versions of the package had no driver manager, and the way to use your own driver was to
+replace the binding of the interface. That still works. A binding tells Laravel's service container
+which class to build when code asks for an interface. Bind your own class in a service provider of
+your application:
 
 **`app/Providers/AiDriverServiceProvider.php`**
 
@@ -171,11 +203,14 @@ Providers of your application register after the providers of packages, so your 
 the one of the package. With `AI_GENERATOR_DRIVER=openai` the `if` is false and the OpenAI driver
 stays in place, which lets you switch back in `.env`.
 
-### Don't use extend()
+This way only the default driver is yours: `using('acme')` and `AI_GENERATOR_FALLBACKS` don't know
+the name `acme`. Use the manager's `extend()` when you need those.
 
-`$this->app->extend(AiContentDriver::class, ...)` does not work here. `extend()` first builds the
-binding of the package, and that one throws `Unsupported AI driver: acme` on a name it does not know,
-before your code runs. Replace the binding, as above.
+### Don't use the container's extend()
+
+`$this->app->extend(AiContentDriver::class, ...)`, the `extend()` of Laravel's container, does not
+work here. It first builds the binding of the package, and that one throws `Unsupported AI driver: acme` on a name it does not know,
+before your code runs. Use the manager's `extend()` or replace the binding, as above.
 
 ## Step 4: check that your driver is used
 
@@ -185,15 +220,16 @@ This does not call any API:
 php artisan tinker --execute="echo get_class(app(\Darvis\LaravelAiGenerator\Contracts\AiContentDriver::class)), PHP_EOL;"
 ```
 
-You should see `App\Services\AiDrivers\AcmeAiDriver`. When you see `Unsupported AI driver: acme`
-instead, your provider is not registered or the name in the `if` differs from
-`AI_GENERATOR_DRIVER`.
+With `AI_GENERATOR_DRIVER=acme` you should see `App\Services\AiDrivers\AcmeAiDriver`. When you see
+`Unsupported AI driver: acme` instead, the code that registers your driver did not run, or the name
+you registered differs from `AI_GENERATOR_DRIVER`.
 
-## generateImage() still calls OpenAI
+## Images with a custom driver
 
-`AiGenerator::generateImage()` does not go through the driver. It always calls the OpenAI image API
-with `OPENAI_API_KEY` and `OPENAI_IMAGE_MODEL`, whatever driver writes the text. Without an OpenAI
-key it returns `['error' => 'OPENAI_API_KEY is not set.']`.
+`AiGenerator::generateImage()` does not go through your text driver. It uses the image driver:
+`AI_GENERATOR_IMAGE_DRIVER` when you set it (`openai`, `gemini` or `xai`), or else OpenAI with
+`OPENAI_API_KEY` and `OPENAI_IMAGE_MODEL`. Without a key it returns an `error`, for example
+`['error' => 'OPENAI_API_KEY is not set.']`.
 
 To add an image to a text from your own driver, you can call it yourself after `generate()`:
 
@@ -204,8 +240,11 @@ use Darvis\LaravelAiGenerator\ContentRequest;
 $generator = app(AiGenerator::class);
 
 $result = $generator->generate(new ContentRequest(topic: 'Your topic'));
-$image = $generator->generateImage('A short description of the image, in English');
+$image = $generator->generateImage($result->imagePrompt ?? 'A short description of the image, in English');
 ```
+
+A driver that can make images itself may also implement
+`Darvis\LaravelAiGenerator\Contracts\AiImageDriver`; see the [API reference](api-reference.md#aiimagedriver).
 
 ## Test your driver
 

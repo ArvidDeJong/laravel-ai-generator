@@ -1,6 +1,7 @@
 <?php
 
 use Darvis\LaravelAiGenerator\Support\AiGeneratorConfig;
+use Darvis\LaravelAiGenerator\Support\Provider;
 
 /**
  * AiGeneratorConfig is the one place that reads the package config. These tests guard the two
@@ -26,6 +27,33 @@ test('the accessors return the values the config file ships', function () {
         ->and(AiGeneratorConfig::openAiModel())->toBe($openAi['model'])
         ->and(AiGeneratorConfig::openAiTemperature())->toBe((float) $openAi['temperature'])
         ->and(AiGeneratorConfig::openAiTimeout())->toBe((int) $openAi['timeout']);
+});
+
+test('every provider has a config section, and its accessors return what the config file ships', function (Provider $provider) {
+    $config = require aiGeneratorRoot('config/ai-generator.php');
+    $section = $config['drivers'][$provider->value];
+
+    expect(AiGeneratorConfig::baseUrl($provider))->toBe($section['base_url'])
+        ->and($provider->defaultBaseUrl())->toBe($section['base_url'])
+        ->and(AiGeneratorConfig::model($provider))->toBe($section['model'])
+        ->and($provider->defaultModel())->toBe($section['model'])
+        ->and(AiGeneratorConfig::imageModel($provider))->toBe($section['image_model'] ?? null)
+        ->and($provider->defaultImageModel())->toBe($section['image_model'] ?? null)
+        ->and(AiGeneratorConfig::temperature($provider))->toBe($section['temperature'] === null ? null : (float) $section['temperature'])
+        ->and(AiGeneratorConfig::timeout($provider))->toBe((int) $section['timeout']);
+})->with(Provider::cases());
+
+test('the multi-provider settings default to no image driver, no fallbacks and the MCP server on', function () {
+    expect(AiGeneratorConfig::imageDriver())->toBeNull()
+        ->and(AiGeneratorConfig::fallbacks())->toBe([])
+        ->and(AiGeneratorConfig::mcpEnabled())->toBeTrue()
+        ->and(AiGeneratorConfig::mcpHandle())->toBe('ai-generator')
+        ->and(AiGeneratorConfig::anthropicMaxTokens())->toBe(8192);
+
+    config(['ai-generator.fallbacks' => ' anthropic, ,gemini ', 'ai-generator.mcp.enabled' => 'false']);
+
+    expect(AiGeneratorConfig::fallbacks())->toBe(['anthropic', 'gemini'])
+        ->and(AiGeneratorConfig::mcpEnabled())->toBeFalse();
 });
 
 test('the accessors follow a changed setting and cast values that come from the env as strings', function () {
