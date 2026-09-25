@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-09-25
+
 ### Added
 - **Claude, Gemini and Grok.** Three new drivers next to OpenAI: `anthropic` (Messages API with
   structured outputs), `gemini` (`generateContent` with a JSON schema) and `xai` (chat completions
