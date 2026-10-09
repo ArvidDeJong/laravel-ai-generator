@@ -112,7 +112,7 @@ See [CHANGELOG](CHANGELOG.md).
 
 ## Support the package
 
-If darvis/laravel-ai-generator saves you time, a star on [GitHub](https://github.com/ArvidDeJong/laravel-ai-generator) or a favourite on [Packagist](https://packagist.org/packages/darvis/laravel-ai-generator) helps other developers find it.
+If darvis/laravel-ai-generator saves you time, buy me a beer 🍺: [sponsor me on GitHub](https://github.com/sponsors/ArvidDeJong).
 
 ## Contributing
 
